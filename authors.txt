@@ -1,0 +1,12 @@
+unpackbootimg:
+http://github.com/huaixzk/android_win_tool/
+
+mkbootfs, mkbootimg:
+http://forum.xda-developers.com/showthread.php?t=1494036
+
+cpio, gzip, cyggcc_s-1, cygiconv-2, cygintl-8, cygwin1:
+http://cygwin.com/
+
+batch scripts:
+osm0sis@xda-developers (scripting)
+Peteragent5, alansj & iridaki@xda-developers (general method)
