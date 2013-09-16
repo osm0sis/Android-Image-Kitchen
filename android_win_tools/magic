@@ -4017,14 +4017,20 @@
 
 # Type: LZMA
 0	lelong&0xffffff	=0x5d
->12	leshort		=0xff			LZMA compressed data,
+>12	leshort		=0xff			lzma compressed data,
 >>5	lequad		=0xffffffffffffffff	streamed
 >>5	lequad		!0xffffffffffffffff	non-streamed, size %lld
 !:mime	application/x-lzma
 
 # http://tukaani.org/xz/xz-file-format.txt
-0	ustring		\xFD7zXZ\x00		XZ compressed data
+0	ustring		\xFD7zXZ\x00		xz compressed data
 !:mime	application/x-xz
+
+# http://fastcompression.blogspot.ca/2013/04/lz4-streaming-format-final.html
+0	lelong		0x184D2204			lz4 compressed data, v1.4+
+0	lelong		0x184C2103			lz4 compressed data, v1.0-1.3
+0	lelong		0x184C2102			lz4 compressed data, v0.1-0.9
+!:mime	application/x-lz4
 
 # https://github.com/ckolivas/lrzip/blob/master/doc/magic.header.txt
 0	string		LRZI			LRZIP compressed data
