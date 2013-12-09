@@ -4,6 +4,7 @@ set hideErrors=n
 
 cd "%~p0"
 if "%~1" == "" goto noargs
+set "file=%~f1"
 set bin=..\android_win_tools
 set "errout= "
 if "%hideErrors%" == "y" set "errout=2>nul"
@@ -12,7 +13,7 @@ echo Android Image Kitchen - UnpackImg Script
 echo by osm0sis @ xda-developers
 echo.
 
-echo Supplied image: %~n1%~x1
+echo Supplied image: %~nx1
 echo.
 
 if not exist split_img\nul goto noclean
@@ -29,12 +30,11 @@ md ramdisk
 echo Splitting image to "/split_img/" . . .
 echo.
 cd split_img
-%bin%\unpackbootimg -i "%~p0%~n1%~x1"
-%bin%\dd ibs=1 count=2 skip=22 obs=1 if="%~p0%~n1%~x1" 2>nul | %bin%\od -h %errout% | %bin%\head -n 1 %errout% | %bin%\cut -c 9- %errout% > %~n1%~x1-ramdiskaddr
-for /f "delims=" %%a in ('type "%~n1%~x1-ramdiskaddr"') do @echo %%a0000 > "%~n1%~x1-ramdiskaddr" & echo BOARD_RAMDISK_ADDR %%a0000
+%bin%\unpackbootimg -i "%file%"
+if errorlevel == 1 call "%~p0\cleanup.bat" & goto error
 echo.
-%bin%\file -m %bin%\magic *-ramdisk.gz %errout% | %bin%\cut -d: -f2 %errout% | %bin%\cut -d" " -f2 %errout% > "%~n1%~x1-ramdiskcomp"
-for /f "delims=" %%a in ('type "%~n1%~x1-ramdiskcomp"') do @set ramdiskcomp=%%a
+%bin%\file -m %bin%\magic *-ramdisk.gz %errout% | %bin%\cut -d: -f2 %errout% | %bin%\cut -d" " -f2 %errout% > "%~nx1-ramdiskcomp"
+for /f "delims=" %%a in ('type "%~nx1-ramdiskcomp"') do @set ramdiskcomp=%%a
 if "%ramdiskcomp%" == "gzip" set "unpackcmd=gzip -dc" & set "compext=gz"
 if "%ramdiskcomp%" == "lzop" set "unpackcmd=lzop -dc" & set "compext=lzo"
 if "%ramdiskcomp%" == "lzma" set "unpackcmd=xz -dc" & set "compext=lzma"
@@ -48,7 +48,9 @@ echo Unpacking ramdisk to "/ramdisk/" . . .
 echo.
 cd ramdisk
 echo Compression used: %ramdiskcomp%
-%bin%\%unpackcmd% "../split_img/%~n1%~x1-ramdisk.cpio.%compext%" %extra% %errout% | %bin%\cpio -i %errout%
+if "%compext%" == "" goto error
+%bin%\%unpackcmd% "../split_img/%~nx1-ramdisk.cpio.%compext%" %extra% %errout% | %bin%\cpio -i %errout%
+if errorlevel == 1 goto error
 echo.
 cd ..
 
@@ -57,6 +59,9 @@ goto end
 
 :noargs
 echo No image file supplied.
+
+:error
+echo Error!
 
 :end
 echo.
