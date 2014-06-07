@@ -8,10 +8,13 @@ https://github.com/trevd/android_system_core_cpio/
 
 bzip2, cpio, cut, file, gzip, lzop, xz;
 cygbz2-1, cyggcc_s-1, cygiconv-2, cygintl-8, cyglzma-5, cyglzo2-2, cygmagic-1, cygwin1, cygz:
-http://cygwin.com/
+http://cygwin.com
 
 lz4:
 http://code.google.com/p/lz4/
+
+magic:
+http://www.darwinsys.com/file/
 
 batch scripts:
 osm0sis@xda-developers (scripting)
