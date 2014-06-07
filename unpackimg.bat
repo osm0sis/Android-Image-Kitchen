@@ -16,7 +16,9 @@ echo.
 echo Supplied image: %~nx1
 echo.
 
-if not exist split_img\nul goto noclean
+if exist split_img\nul set "noclean=1"
+if exist ramdisk\nul set "noclean=1"
+if not "%noclean%" == "1" goto noclean
 echo Removing old work folders and files . . .
 echo.
 call cleanup.bat

@@ -1,7 +1,7 @@
 #------------------------------------------------------------------------------
 # Slimmed down magic file for archives only
 #------------------------------------------------------------------------------
-# $File: archive,v 1.70 2011/10/26 15:44:47 christos Exp $
+# $File: archive,v 1.82 2014/03/14 18:47:29 christos Exp $
 # archive:  file(1) magic for archive formats (see also "msdos" for self-
 #           extracting compressed archives)
 #
@@ -38,12 +38,66 @@
 0	string		070701		ASCII cpio archive (SVR4 with no CRC)
 0	string		070702		ASCII cpio archive (SVR4 with CRC)
 
-# Debian package (needs to go before regular portable archives)
+#
+# Various archive formats used by various versions of the "ar"
+# command.
+#
+
+#
+# Original UNIX archive formats.
+# They were written with binary values in host byte order, and
+# the magic number was a host "int", which might have been 16 bits
+# or 32 bits.  We don't say "PDP-11" or "VAX", as there might have
+# been ports to little-endian 16-bit-int or 32-bit-int platforms
+# (x86?) using some of those formats; if none existed, feel free
+# to use "PDP-11" for little-endian 16-bit and "VAX" for little-endian
+# 32-bit.  There might have been big-endian ports of that sort as
+# well.
+#
+0	leshort		0177555		very old 16-bit-int little-endian archive
+0	beshort		0177555		very old 16-bit-int big-endian archive
+0	lelong		0177555		very old 32-bit-int little-endian archive
+0	belong		0177555		very old 32-bit-int big-endian archive
+
+0	leshort		0177545		old 16-bit-int little-endian archive
+>2	string		__.SYMDEF	random library
+0	beshort		0177545		old 16-bit-int big-endian archive
+>2	string		__.SYMDEF	random library
+0	lelong		0177545		old 32-bit-int little-endian archive
+>4	string		__.SYMDEF	random library
+0	belong		0177545		old 32-bit-int big-endian archive
+>4	string		__.SYMDEF	random library
+
+#
+# From "pdp" (but why a 4-byte quantity?)
+#
+0	lelong		0x39bed		PDP-11 old archive
+0	lelong		0x39bee		PDP-11 4.0 archive
+
+#
+# XXX - what flavor of APL used this, and was it a variant of
+# some ar archive format?  It's similar to, but not the same
+# as, the APL workspace magic numbers in pdp.
+#
+0	long		0100554		apl workspace
+
+#
+# System V Release 1 portable(?) archive format.
+#
+0	string		=<ar>		System V Release 1 ar archive
+!:mime	application/x-archive
+
+#
+# Debian package; it's in the portable archive format, and needs to go
+# before the entry for regular portable archives, as it's recognized as
+# a portable archive whose first member has a name beginning with
+# "debian".
 #
 0	string		=!<arch>\ndebian
-!:mime	application/x-debian-package
 >8	string		debian-split	part of multipart Debian package
+!:mime	application/x-debian-package
 >8	string		debian-binary	Debian binary package
+!:mime	application/x-debian-package
 >8	string		!debian
 >68	string		>\0		(format %s)
 # These next two lines do not work, because a bzip2 Debian archive
@@ -55,18 +109,14 @@
 #>84	string		gz		\b, uses gzip compression
 #>136	ledate		x		created: %s
 
-# other archives
-0	long		0177555		very old archive
-0	short		0177555		very old PDP-11 archive
-0	long		0177545		old archive
-0	short		0177545		old PDP-11 archive
-0	long		0100554		apl workspace
-0	string		=<ar>		archive
-!:mime	application/x-archive
-
-# MIPS archive (needs to go before regular portable archives)
+#
+# MIPS archive; they're in the portable archive format, and need to go
+# before the entry for regular portable archives, as it's recognized as
+# a portable archive whose first member has a name beginning with
+# "__________E".
 #
 0	string	=!<arch>\n__________E	MIPS archive
+!:mime	application/x-archive
 >20	string	U			with MIPS Ucode members
 >21	string	L			with MIPSEL members
 >21	string	B			with MIPSEB members
@@ -77,56 +127,20 @@
 0	search/1	-h-		Software Tools format archive text
 
 #
-# XXX - why are there multiple <ar> thingies?  Note that 0x213c6172 is
-# "!<ar", so, for new-style (4.xBSD/SVR2andup) archives, we have:
-#
-# 0	string		=!<arch>		current ar archive
-# 0	long		0x213c6172	archive file
-#
-# and for SVR1 archives, we have:
-#
-# 0	string		\<ar>		System V Release 1 ar archive
-# 0	string		=<ar>		archive
-#
-# XXX - did Aegis really store shared libraries, breakpointed modules,
-# and absolute code program modules in the same format as new-style
-# "ar" archives?
+# BSD/SVR2-and-later portable archive formats.
 #
 0	string		=!<arch>		current ar archive
 !:mime	application/x-archive
 >8	string		__.SYMDEF	random library
->0	belong		=65538		- pre SR9.5
->0	belong		=65539		- post SR9.5
->0	beshort		2		- object archive
->0	beshort		3		- shared library module
->0	beshort		4		- debug break-pointed module
->0	beshort		5		- absolute code program module
-0	string		\<ar>		System V Release 1 ar archive
-0	string		=<ar>		archive
+>68	string		__.SYMDEF\ SORTED	random library
+
 #
-# XXX - from "vax", which appears to collect a bunch of byte-swapped
-# thingies, to help you recognize VAX files on big-endian machines;
-# with "leshort", "lelong", and "string", that's no longer necessary....
+# "Thin" archive, as can be produced by GNU ar.
 #
-0	belong		0x65ff0000	VAX 3.0 archive
-0	belong		0x3c61723e	VAX 5.0 archive
-#
-0	long		0x213c6172	archive file
-0	lelong		0177555		very old VAX archive
-0	leshort		0177555		very old PDP-11 archive
-#
-# XXX - "pdp" claims that 0177545 can have an __.SYMDEF member and thus
-# be a random library (it said 0xff65 rather than 0177545).
-#
-0	lelong		0177545		old VAX archive
->8	string		__.SYMDEF	random library
-0	leshort		0177545		old PDP-11 archive
->8	string		__.SYMDEF	random library
-#
-# From "pdp" (but why a 4-byte quantity?)
-#
-0	lelong		0x39bed		PDP-11 old archive
-0	lelong		0x39bee		PDP-11 4.0 archive
+0	string		=!<thin>\n	thin archive with
+>68	belong		0		no symbol entries
+>68	belong		1		%d symbol entry
+>68	belong		>1		%d symbol entries
 
 # ARC archiver, from Daniel Quinlan (quinlan@yggdrasil.com)
 #
@@ -186,7 +200,10 @@
 # SAR
 3	string	LH5 SAR archive data
 # BSArc/BS2
-0	string	\212\3SB \0 BSArc/BS2 archive data
+0	string	\212\3SB\020\0	BSArc/BS2 archive data
+# Bethesda Softworks Archive (Oblivion)
+0	string	BSA\0 		BSArc archive data
+>4	lelong	x		version %d
 # MAR
 2	string	=-ah MAR archive data
 # ACB
@@ -211,7 +228,7 @@
 # AMGC
 0	string	\xad6" AMGC archive data
 # NuLIB
-0	string	NõFélå NuLIB archive data
+0	string	N\xc3\xb5F\xc3\xa9lx\xc3\xa5 NuLIB archive data
 # PakLeo
 0	string	LEOLZW PAKLeo archive data
 # ChArc
@@ -223,7 +240,7 @@
 # Freeze
 0	string	\x1f\x9f\x4a\x10\x0a Freeze archive data
 # KBoom
-0	string	¨MP¨ KBoom archive data
+0	string	\xc2\xa8MP\xc2\xa8 KBoom archive data
 # NSQ, must go after CDC Codec
 0	string	\x76\xff NSQ archive data
 # DPA
@@ -261,7 +278,7 @@
 # MP3 (archiver, not lossy audio compression)
 0	string	MP3\x1a MP3-Archiver archive data
 # ZET
-0	string	OZÝ ZET archive data
+0	string	OZ\xc3\x9d ZET archive data
 # TSComp
 0	string	\x65\x5d\x13\x8c\x08\x01\x03\x00 TSComp archive data
 # ARQ
@@ -292,7 +309,7 @@
 # Xtreme
 0	string	ULEB\0 Xtreme archive data
 # Pack Magic
-0	string	@â\1\0 Pack Magic archive data
+0	string	@\xc3\xa2\1\0 Pack Magic archive data
 # BTS
 0	belong&0xfeffffff	0x1a034465 BTS archive data
 # ELI 5750
@@ -428,7 +445,7 @@
 # XPack Data
 0	string	xpa XPack archive data
 # XPack Single Data
-0	string	Í\ jm XPack single archive data
+0	string	\xc3\x8d\ jm XPack single archive data
 
 # TODO: missing due to unknown magic/magic at end of file:
 #DWC
@@ -573,6 +590,7 @@
 !:mime	application/zip
 
 # Zip archives (Greg Roelofs, c/o zip-bugs@wkuvx1.wku.edu)
+0	string		PK\005\006	Zip archive data (empty)
 0	string		PK\003\004
 
 # Specialised zip formats which start with a member named 'mimetype'
@@ -580,6 +598,92 @@
 # Check for have 8-byte name, 0-byte extra field, name "mimetype", and
 #  contents starting with "application/":
 >26	string		\x8\0\0\0mimetypeapplication/
+
+#  KOffice / OpenOffice & StarOffice / OpenDocument formats
+#    From: Abel Cheung <abel@oaka.org>
+
+#   KOffice (1.2 or above) formats
+#    (mimetype contains "application/vnd.kde.<SUBTYPE>")
+>>50	string	vnd.kde.		KOffice (>=1.2)
+>>>58	string	karbon			Karbon document
+>>>58	string	kchart			KChart document
+>>>58	string	kformula		KFormula document
+>>>58	string	kivio			Kivio document
+>>>58	string	kontour			Kontour document
+>>>58	string	kpresenter		KPresenter document
+>>>58	string	kspread			KSpread document
+>>>58	string	kword			KWord document
+
+#   OpenOffice formats (for OpenOffice 1.x / StarOffice 6/7)
+#    (mimetype contains "application/vnd.sun.xml.<SUBTYPE>")
+>>50	string	vnd.sun.xml.		OpenOffice.org 1.x
+>>>62	string	writer			Writer
+>>>>68	byte	!0x2e			document
+>>>>68	string	.template		template
+>>>>68	string	.global			global document
+>>>62	string	calc			Calc
+>>>>66	byte	!0x2e			spreadsheet
+>>>>66	string	.template		template
+>>>62	string	draw			Draw
+>>>>66	byte	!0x2e			document
+>>>>66	string	.template		template
+>>>62	string	impress			Impress
+>>>>69	byte	!0x2e			presentation
+>>>>69	string	.template		template
+>>>62	string	math			Math document
+>>>62	string	base			Database file
+
+#   OpenDocument formats (for OpenOffice 2.x / StarOffice >= 8)
+#    http://lists.oasis-open.org/archives/office/200505/msg00006.html
+#    (mimetype contains "application/vnd.oasis.opendocument.<SUBTYPE>")
+>>50	string	vnd.oasis.opendocument.	OpenDocument
+>>>73	string	text
+>>>>77	byte	!0x2d			Text
+!:mime	application/vnd.oasis.opendocument.text
+>>>>77	string	-template		Text Template
+!:mime	application/vnd.oasis.opendocument.text-template
+>>>>77	string	-web			HTML Document Template
+!:mime	application/vnd.oasis.opendocument.text-web
+>>>>77	string	-master			Master Document
+!:mime	application/vnd.oasis.opendocument.text-master
+>>>73	string	graphics
+>>>>81	byte	!0x2d			Drawing
+!:mime	application/vnd.oasis.opendocument.graphics
+>>>>81	string	-template		Template
+!:mime	application/vnd.oasis.opendocument.graphics-template
+>>>73	string	presentation
+>>>>85	byte	!0x2d			Presentation
+!:mime	application/vnd.oasis.opendocument.presentation
+>>>>85	string	-template		Template
+!:mime	application/vnd.oasis.opendocument.presentation-template
+>>>73	string	spreadsheet
+>>>>84	byte	!0x2d			Spreadsheet
+!:mime	application/vnd.oasis.opendocument.spreadsheet
+>>>>84	string	-template		Template
+!:mime	application/vnd.oasis.opendocument.spreadsheet-template
+>>>73	string	chart
+>>>>78	byte	!0x2d			Chart
+!:mime	application/vnd.oasis.opendocument.chart
+>>>>78	string	-template		Template
+!:mime	application/vnd.oasis.opendocument.chart-template
+>>>73	string	formula
+>>>>80	byte	!0x2d			Formula
+!:mime	application/vnd.oasis.opendocument.formula
+>>>>80	string	-template		Template
+!:mime	application/vnd.oasis.opendocument.formula-template
+>>>73	string	database		Database
+!:mime	application/vnd.oasis.opendocument.database
+>>>73	string	image
+>>>>78	byte	!0x2d			Image
+!:mime	application/vnd.oasis.opendocument.image
+>>>>78	string	-template		Template
+!:mime	application/vnd.oasis.opendocument.image-template
+
+#  EPUB (OEBPS) books using OCF (OEBPS Container Format)
+#    http://www.idpf.org/ocf/ocf1.0/download/ocf10.htm, section 4.
+#    From: Ralf Brown <ralf.brown@gmail.com>
+>>50	string	epub+zip	EPUB document
+!:mime application/epub+zip
 
 #  Catch other ZIP-with-mimetype formats
 #	In a ZIP file, the bytes immediately after a member's contents are
@@ -599,16 +703,27 @@
 >>>38		regex	[!-OQ-~]+		Zip data (MIME type "%s"?)
 !:mime	application/zip
 
+# Java Jar files
+>(26.s+30)	leshort	0xcafe		Java archive data (JAR)
+!:mime	application/java-archive
+
 # Generic zip archives (Greg Roelofs, c/o zip-bugs@wkuvx1.wku.edu)
 #   Next line excludes specialized formats:
->26    string          !\x8\0\0\0mimetype	Zip archive data
+>(26.s+30)	leshort	!0xcafe
+>>26    string          !\x8\0\0\0mimetype	Zip archive data
 !:mime	application/zip
->>4	byte		0x09		\b, at least v0.9 to extract
->>4	byte		0x0a		\b, at least v1.0 to extract
->>4	byte		0x0b		\b, at least v1.1 to extract
->>4	byte		0x14		\b, at least v2.0 to extract
->>4	byte		0x2d		\b, at least v3.0 to extract
->>0x161	string		WINZIP		\b, WinZIP self-extracting
+>>>4	byte		0x09		\b, at least v0.9 to extract
+>>>4	byte		0x0a		\b, at least v1.0 to extract
+>>>4	byte		0x0b		\b, at least v1.1 to extract
+>>>4	byte		0x14		\b, at least v2.0 to extract
+>>>4	byte		0x2d		\b, at least v3.0 to extract
+>>>0x161	string		WINZIP		\b, WinZIP self-extracting
+
+# StarView Metafile
+# From Pierre Ducroquet <pinaraf@pinaraf.info>
+0	string	VCLMTF	StarView MetaFile
+>6	beshort	x	\b, version %d
+>8	belong	x	\b, size %d
 
 # Zoo archiver
 20	lelong		0xfdc4a7dc	Zoo archive data
@@ -789,8 +904,28 @@
 12	string	BB02		Bacula volume
 >20	bedate	x		\b, started %s
 
+# ePub is XHTML + XML inside a ZIP archive.  The first member of the
+#   archive must be an uncompressed file called 'mimetype' with contents
+#   'application/epub+zip'
+
+
+# From: "Michael Gorny" <mgorny@gentoo.org>
+# ZPAQ: http://mattmahoney.net/dc/zpaq.html
+0	string	zPQ	ZPAQ stream
+>3	byte	x	\b, level %d
+
+# BBeB ebook, unencrypted (LRF format)
+# URL: http://www.sven.de/librie/Librie/LrfFormat
+# From: Adam Buchbinder <adam.buchbinder@gmail.com>
+0	string	L\0R\0F\0\0\0	BBeB ebook data, unencrypted
+>8	beshort	x		\b, version %d
+>36	byte	1		\b, front-to-back
+>36	byte	16		\b, back-to-front
+>42	beshort	x		\b, (%dx,
+>44	beshort	x		%d)
+
 #------------------------------------------------------------------------------
-# $File: compress,v 1.49 2011/12/07 22:04:27 christos Exp $
+# $File: compress,v 1.54 2014/03/14 18:47:29 christos Exp $
 # compress:  file(1) magic for pure-compression formats (no archives)
 #
 # compress, gzip, pack, compact, huf, squeeze, crunch, freeze, yabba, etc.
@@ -813,6 +948,7 @@
 #         other than 8 ("deflate", the only method defined in RFC 1952).
 0       string          \037\213        gzip compressed data
 !:mime	application/x-gzip
+!:strength * 2
 >2	byte		<8		\b, reserved method
 >2	byte		>8		\b, unknown method
 >3	byte		&0x01		\b, ASCII
@@ -821,6 +957,10 @@
 >3	byte&0xC	=0x08
 >>10	string		x		\b, was "%s"
 >3	byte		&0x10		\b, has comment
+>3	byte		&0x20		\b, encrypted
+>4	ledate		>0		\b, last modified: %s
+>8	byte		2		\b, max compression
+>8	byte		4		\b, max speed
 >9	byte		=0x00		\b, from FAT filesystem (MS-DOS, OS/2, NT)
 >9	byte		=0x01		\b, from Amiga
 >9	byte		=0x02		\b, from VMS
@@ -835,11 +975,6 @@
 >9	byte		=0x0B		\b, from NTFS filesystem (NT)
 >9	byte		=0x0C		\b, from QDOS
 >9	byte		=0x0D		\b, from Acorn RISCOS
->3	byte		&0x10		\b, comment
->3	byte		&0x20		\b, encrypted
->4	ledate		>0		\b, last modified: %s
->8	byte		2		\b, max compression
->8	byte		4		\b, max speed
 
 # packed data, Huffman (minimum redundancy) codes on a byte-by-byte basis
 0	string		\037\036	packed data
@@ -982,14 +1117,23 @@
 
 # Type: LZMA
 0	lelong&0xffffff	=0x5d
->12	leshort		=0xff			lzma compressed data,
+>12	leshort		0xff			lzma compressed data,
+!:mime	application/x-lzma
 >>5	lequad		=0xffffffffffffffff	streamed
 >>5	lequad		!0xffffffffffffffff	non-streamed, size %lld
-!:mime	application/x-lzma
+>12	leshort		0			lzma compressed data,
+>>5	lequad		=0xffffffffffffffff	streamed
+>>5	lequad		!0xffffffffffffffff	non-streamed, size %lld
 
 # http://tukaani.org/xz/xz-file-format.txt
 0	ustring		\xFD7zXZ\x00		xz compressed data
 !:mime	application/x-xz
+
+# https://github.com/ckolivas/lrzip/blob/master/doc/magic.header.txt
+0	string		LRZI			LRZIP compressed data
+>4	byte		x			- version %d
+>5	byte		x			\b.%d
+!:mime	application/x-lrzip
 
 # http://fastcompression.blogspot.ca/2013/04/lz4-streaming-format-final.html
 # Added by osm0sis@xda-developers.com
@@ -997,12 +1141,6 @@
 0	lelong		0x184C2103			lz4 compressed data, v1.0-1.3
 0	lelong		0x184C2102			lz4 compressed data, v0.1-0.9
 !:mime	application/x-lz4
-
-# https://github.com/ckolivas/lrzip/blob/master/doc/magic.header.txt
-0	string		LRZI			LRZIP compressed data
->4	byte		x			- version %d
->5	byte		x			\b.%d
-!:mime	application/x-lrzip
 
 # AFX compressed files (Wolfram Kleff)
 2	string		-afx-		AFX compressed file data
@@ -1028,3 +1166,64 @@
 >7	long	>0		, original size: %i bytes
 >15	long	>30		, block size: %i bytes
 
+# Valve Pack (VPK) files
+0	lelong	0x55aa1234	Valve Pak file
+>0x4	lelong	x		\b, version %u
+>0x8	lelong	x		\b, %u entries
+
+#------------------------------------------------------------
+# $File: android,v 1.3 2013/11/08 01:24:22 christos Exp $
+# Various android related magic entries
+#------------------------------------------------------------
+
+# Dalvik .dex format. http://retrodev.com/android/dexformat.html
+# From <mkf@google.com> "Mike Fleming"
+# Fixed to avoid regexec 17 errors on some dex files
+# From <diff@lookout.com> "Tim Strazzere"
+0	string	dex\n
+>0	regex	dex\n[0-9]{2}\0	Dalvik dex file
+>4	string	>000			version %s
+0	string	dey\n
+>0	regex	dey\n[0-9]{2}\0	Dalvik dex file (optimized for host)
+>4	string	>000			version %s
+
+# Android bootimg format
+# From https://android.googlesource.com/platform/system/core/+/master/mkbootimg/bootimg.h
+# Modded by osm0sis@xda-developers.com
+0		string	ANDROID!	Android bootimg
+>1024		string	LOKI\01		\b, LOKI'd
+>8		lelong	>0			\b, kernel
+>>12	lelong	>0			\b (0x%x)
+>16		lelong	>0			\b, ramdisk
+>>20	lelong	>0			\b (0x%x)
+>24		lelong	>0			\b, second stage
+>>28	lelong	>0			\b (0x%x)
+>36		lelong	>0			\b, page size: %d
+>38		string	>0			\b, name: %s
+>64		string	>0		 	\b, cmdline (%s)
+
+# Android Backup archive
+# From: Ariel Shkedi
+# File extension: .ab
+# No mime-type defined
+# URL: https://github.com/android/platform_frameworks_base/blob/\
+# 0bacfd2ba68d21a68a3df345b830bc2a1e515b5a/services/java/com/\
+# android/server/BackupManagerService.java#L2367
+# After the header comes a tar file
+# If compressed, the entire tar file is compressed with JAVA deflate
+#
+# Include the version number hardcoded with the magic string to avoid
+# false positives
+0	string/b	ANDROID\ BACKUP\n1\n	Android Backup
+>17	string		0\n			\b, Not-Compressed
+>17	string		1\n			\b, Compressed
+# any string as long as it's not the word none (which is matched below)
+>>19    regex/1		\^([^n\n]|n[^o]|no[^n]|non[^e]|none.+).*	\b, Encrypted (%s)
+>>19	string		none\n			\b, Not-Encrypted
+# Commented out because they don't seem useful to print
+# (but they are part of the header - the tar file comes after them):
+#>>>&1		regex/1 .*	\b, Password salt: %s
+#>>>>&1		regex/1 .*	\b, Master salt: %s
+#>>>>>&1	regex/1 .*	\b, PBKDF2 rounds: %s
+#>>>>>>&1	regex/1 .*	\b, IV: %s
+#>>>>>>>&1	regex/1 .*	\b, Key: %s

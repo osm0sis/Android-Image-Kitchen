@@ -4,6 +4,7 @@ set hideErrors=n
 
 cd "%~p0"
 if not exist split_img\nul goto nofiles
+if not exist ramdisk\nul goto nofiles
 set bin=android_win_tools
 set "args=%*"
 set "errout= "
@@ -46,6 +47,9 @@ if "%args%" == "-o" echo ramdisk = %ramdisk% & set "ramdisk=--ramdisk "split_img
 for /f "delims=" %%a in ('dir /b split_img\*-cmdline') do @set cmdname=%%a
 for /f "delims=" %%a in ('type "split_img\%cmdname%"') do @set cmdline=%%a
 echo cmdline = %cmdline%
+for /f "delims=" %%a in ('dir /b split_img\*-board') do @set boardname=%%a
+for /f "delims=" %%a in ('type "split_img\%boardname%"') do @set board=%%a
+echo board = %board%
 for /f "delims=" %%a in ('dir /b split_img\*-base') do @set basename=%%a
 for /f "delims=" %%a in ('type "split_img\%basename%"') do @set base=%%a
 echo base = %base%
@@ -77,8 +81,7 @@ echo.
 echo Building image . . .
 echo.
 if not "%args%" == "-o" set "ramdisk=--ramdisk ramdisk-new.cpio.%compext%"
-if not "%cmdline%" == "" set "cmdline=--cmdline '%cmdline%'"
-%bin%\mkbootimg --kernel "split_img/%kernel%" %ramdisk% %second% %cmdline% --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% %second_offset% --tags_offset %tagsoff% %dtb% -o image-new.img %errout%
+%bin%\mkbootimg --kernel "split_img/%kernel%" %ramdisk% %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% %second_offset% --tags_offset %tagsoff% %dtb% -o image-new.img %errout%
 if errorlevel == 1 goto error
 
 echo Done!
