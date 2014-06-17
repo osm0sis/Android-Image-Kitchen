@@ -1,0 +1,25 @@
+unpackbootimg, mkbootimg:
+https://github.com/CyanogenMod/android_system_core/tree/cm-10.2/mkbootimg/ (inital sources)
+https://github.com/huaixzk/unpackbootimg/ (makefiles)
+https://github.com/osm0sis/mkbootimg/ (patches)
+
+mkbootfs:
+https://github.com/CyanogenMod/android_system_core/tree/cm-11.0/cpio/ (initial source)
+https://github.com/trevd/android_system_core_cpio/ (makefile)
+https://github.com/osm0sis/mkbootfs/ (patches)
+
+busybox:
+http://www.bitcubate.com/apps/index.html
+
+file, magic:
+http://www.darwinsys.com/file/
+
+xz:
+http://tukaani.org/xz/
+
+lz4:
+http://code.google.com/p/lz4/
+
+shell scripts:
+osm0sis@xda-developers (scripting)
+Peteragent5, alansj & iridaki@xda-developers (general method)

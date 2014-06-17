@@ -1,0 +1,38 @@
+ui_print(" ");
+ui_print("Android Image Kitchen - Mobile Edition");
+ui_print("Installer Script");
+ui_print("by osm0sis @ xda-developers");
+show_progress(1.34, 0);
+
+ui_print(" ");
+ui_print("Mounting...");
+run_program("/sbin/busybox", "mount", "/data");
+run_program("/sbin/busybox", "mount", "/system");
+set_progress(0.2);
+
+ui_print(" ");
+ui_print("Installing to /data/local/AIK-mobile/ ...");
+package_extract_dir("data", "/data");
+set_perm_recursive(0, 0, 0755, 0755, "/data/local/AIK-mobile");
+set_perm(0, 0, 0644, "/data/local/AIK-mobile/authors.txt", "/data/local/AIK-mobile/bin/magic");
+set_progress(0.8);
+
+ui_print(" ");
+ui_print("Copying helper script /system/xbin/aik ...");
+package_extract_dir("system", "/system");
+set_perm(0, 0, 0755, "/system/xbin/aik");
+set_progress(1.0);
+
+ui_print(" ");
+ui_print("Unmounting...");
+unmount("/data");
+unmount("/system");
+set_progress(1.2);
+
+ui_print(" ");
+ui_print("Done!");
+ui_print(" ");
+ui_print("Run 'aik' from the commandline when booted");
+ui_print("then './unpackimg.sh -.img' to get started");
+set_progress(1.34);
+
