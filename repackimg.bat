@@ -9,7 +9,6 @@ set bin=android_win_tools
 set "args=%*"
 set "errout= "
 if "%hideErrors%" == "y" set "errout=2>nul"
-if "%args%" == "--original" set "args=-o"
 
 echo Android Image Kitchen - RepackImg Script
 echo by osm0sis @ xda-developers
@@ -21,7 +20,7 @@ echo.
 
 :nowarning
 del ramdisk-new.cpio* 2>nul
-if "%args%" == "-o" echo Repacking with original ramdisk . . . & goto skipramdisk
+if "%args%" == "--original" echo Repacking with original ramdisk . . . & goto skipramdisk
 echo Packing ramdisk . . .
 echo.
 for /f "delims=" %%a in ('dir /b split_img\*-ramdiskcomp') do @set ramdiskcname=%%a
@@ -43,7 +42,7 @@ echo.
 for /f "delims=" %%a in ('dir /b split_img\*-zImage') do @set kernel=%%a
 echo kernel = %kernel%
 for /f "delims=" %%a in ('dir /b split_img\*-ramdisk.cpio*') do @set ramdisk=%%a
-if "%args%" == "-o" echo ramdisk = %ramdisk% & set "ramdisk=--ramdisk "split_img/%ramdisk%""
+if "%args%" == "--original" echo ramdisk = %ramdisk% & set "ramdisk=--ramdisk "split_img/%ramdisk%""
 for /f "delims=" %%a in ('dir /b split_img\*-cmdline') do @set cmdname=%%a
 for /f "delims=" %%a in ('type "split_img\%cmdname%"') do @set cmdline=%%a
 echo cmdline = %cmdline%
@@ -80,7 +79,7 @@ echo.
 
 echo Building image . . .
 echo.
-if not "%args%" == "-o" set "ramdisk=--ramdisk ramdisk-new.cpio.%compext%"
+if not "%args%" == "--original" set "ramdisk=--ramdisk ramdisk-new.cpio.%compext%"
 %bin%\mkbootimg --kernel "split_img/%kernel%" %ramdisk% %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% %second_offset% --tags_offset %tagsoff% %dtb% -o image-new.img %errout%
 if errorlevel == 1 goto error
 

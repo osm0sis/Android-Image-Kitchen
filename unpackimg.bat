@@ -2,6 +2,7 @@
 set CYGWIN=nodosfilewarning
 set hideErrors=n
 
+%~d0
 cd "%~p0"
 if "%~1" == "" goto noargs
 set "file=%~f1"
