@@ -1,0 +1,17 @@
+unpackbootimg, mkbootimg:
+https://github.com/CyanogenMod/android_system_core/tree/cm-10.2/mkbootimg/ (inital sources)
+https://github.com/huaixzk/unpackbootimg/ (makefiles)
+https://github.com/osm0sis/mkbootimg/ (patches)
+
+lz4:
+http://code.google.com/p/lz4/
+
+magic:
+http://www.darwinsys.com/file/
+
+gzip, bzip2, lzop, xz; basename, cpio, file, find:
+(required system packages)
+
+shell scripts:
+osm0sis@xda-developers (scripting)
+Peteragent5, alansj & iridaki@xda-developers (general method)
