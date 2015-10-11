@@ -50,9 +50,9 @@ fi;
 echo "Setting up work folders...\n";
 mkdir split_img ramdisk;
 
-echo 'Splitting image to "split_img/"...'
+echo 'Splitting image to "split_img/"...';
 $bin/unpackbootimg -i "$1" -o split_img;
-if [ $? == "1" ]; then
+if [ $? != "0" ]; then
   cleanup;
   abort;
   return 1;
@@ -86,7 +86,7 @@ if [ ! "$compext" ]; then
   return 1;
 fi;
 $unpackcmd "../split_img/$file-ramdisk.cpio$compext" $extra | $bb cpio -i;
-if [ $? == "1" ]; then
+if [ $? != "0" ]; then
   abort;
   return 1;
 fi;

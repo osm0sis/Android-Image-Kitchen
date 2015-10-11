@@ -11,7 +11,6 @@ esac;
 
 abort() { cd "$PWD"; echo "Error!"; }
 
-args="$*";
 bin="$PWD/bin";
 bb="$bin/busybox";
 chmod -R 755 "$bin" "$PWD"/*.sh;
@@ -37,26 +36,31 @@ if [ ! -z "$(ls *-new.* 2> /dev/null)" ]; then
 fi;
 
 rm -f ramdisk-new.cpio*;
-case $args in
-  -o|--original)
-    args=-o;
+case $1 in
+  --original)
     echo "Repacking with original ramdisk...";;
-  *)
+  --level|*)
     echo "Packing ramdisk...\n";
     ramdiskcomp=`cat split_img/*-ramdiskcomp`;
-    echo "Using compression: $ramdiskcomp";
-    repackcmd="$bb $ramdiskcomp";
+    if [ "$1" == "--level" -a "$2" ]; then
+      level="-$2";
+      lvltxt=" - Level: $2";
+    elif [ "$ramdiskcomp" == "xz" ]; then
+      level=-1;
+    fi;
+    echo "Using compression: $ramdiskcomp$lvltxt";
+    repackcmd="$ramdiskcomp $level";
     compext=$ramdiskcomp;
     case $ramdiskcomp in
       gzip) compext=gz;;
       lzop) compext=lzo;;
-      xz) repackcmd="$bin/xz -1 -Ccrc32";;
-      lzma) repackcmd="$bin/xz -Flzma";;
+      xz) repackcmd="$bin/xz $level -Ccrc32";;
+      lzma) repackcmd="$bin/xz $level -Flzma";;
       bzip2) compext=bz2;;
-      lz4) repackcmd="$bin/lz4 -l stdin stdout";;
+      lz4) repackcmd="$bin/lz4 $level -l stdin stdout";;
     esac;
     $bin/mkbootfs ramdisk | $repackcmd > ramdisk-new.cpio.$compext;
-    if [ $? == "1" ]; then
+    if [ $? != "0" ]; then
       abort;
       return 1;
     fi;;
@@ -65,7 +69,7 @@ esac;
 echo "\nGetting build information...";
 cd split_img;
 kernel=`ls *-zImage`;               echo "kernel = $kernel";
-if [ "$args" == "-o" ]; then
+if [ "$1" == "--original" ]; then
   ramdisk=`ls *-ramdisk.cpio*`;     echo "ramdisk = $ramdisk";
   ramdisk="split_img/$ramdisk";
 else
@@ -90,9 +94,9 @@ if [ -f *-dtb ]; then
 fi;
 cd ..;
 
-echo "\nBuilding image...\n"
+echo "\nBuilding image...\n";
 $bin/mkbootimg --kernel "split_img/$kernel" --ramdisk "$ramdisk" $second --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff $secondoff --tags_offset $tagsoff $dtb -o image-new.img;
-if [ $? == "1" ]; then
+if [ $? != "0" ]; then
   abort;
   return 1;
 fi;

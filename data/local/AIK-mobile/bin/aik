@@ -2,7 +2,21 @@
 # AIK-mobile/aik: command-line shortcut to the work dir
 # osm0sis @ xda-developers
 
-# go local and request root
-cd /data/local/AIK-mobile;
-su;
+aik=/data/local/AIK-mobile;
+
+case $1 in
+  --restore)
+    # remount system and fix symlink
+    su -c "mount -o rw,remount -t auto /system";
+    su -c "rm -f /system/xbin/aik";
+    su -c "ln -s $aik/bin/aik /system/xbin/aik";
+    su -c "mount -o ro,remount -t auto /system";
+    echo "aik: system symlink restored!";
+  ;;
+  *)
+    # go local and request root
+    cd $aik;
+    su;
+  ;;
+esac;
 

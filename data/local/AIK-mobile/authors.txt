@@ -9,7 +9,7 @@ https://github.com/trevd/android_system_core_cpio/ (makefile)
 https://github.com/osm0sis/mkbootfs/ (patches)
 
 busybox:
-http://www.bitcubate.com/apps/index.html
+http://www.bitcubatex.com/apps/
 
 file, magic:
 http://www.darwinsys.com/file/

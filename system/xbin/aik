@@ -1,8 +1,0 @@
-#!/system/bin/sh
-# AIK-mobile/aik: command-line shortcut to the work dir
-# osm0sis @ xda-developers
-
-# go local and request root
-cd /data/local/AIK-mobile;
-su;
-
