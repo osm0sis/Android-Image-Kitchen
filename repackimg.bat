@@ -55,9 +55,11 @@ if not "%1" == "--original" set "ramdisk=--ramdisk ramdisk-new.cpio.%compext%"
 for /f "delims=" %%a in ('dir /b split_img\*-cmdline') do @set cmdname=%%a
 for /f "delims=" %%a in ('type "split_img\%cmdname%"') do @set cmdline=%%a
 echo cmdline = %cmdline%
+if defined cmdline set cmdline=%cmdline:"=\"%
 for /f "delims=" %%a in ('dir /b split_img\*-board') do @set boardname=%%a
 for /f "delims=" %%a in ('type "split_img\%boardname%"') do @set board=%%a
 echo board = %board%
+if defined board set board=%board:"=\"%
 for /f "delims=" %%a in ('dir /b split_img\*-base') do @set basename=%%a
 for /f "delims=" %%a in ('type "split_img\%basename%"') do @set base=%%a
 echo base = %base%
