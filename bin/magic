@@ -1,7 +1,7 @@
 #------------------------------------------------------------------------------
 # Slimmed down magic file for archives only
 #------------------------------------------------------------------------------
-# $File: archive,v 1.86 2014/06/01 19:15:26 christos Exp $
+# $File: archive,v 1.90 2015/04/24 15:44:12 christos Exp $
 # archive:  file(1) magic for archive formats (see also "msdos" for self-
 #           extracting compressed archives)
 #
@@ -436,16 +436,34 @@
 # AIN
 0	string	\x33\x18 AIN archive data
 0	string	\x33\x17 AIN archive data
-# XPA32
-0	string	xpa\0\1 XPA32 archive data
+# XPA32 test moved and merged with XPA by Joerg Jenderek at Sep 2015
 # SZip (TODO: doesn't catch all versions)
 0	string	SZ\x0a\4 SZip archive data
 # XPack DiskImage
-0	string	jm XPack DiskImage archive data
+# *.XDI updated by Joerg Jenderek Sep 2015
+# ftp://ftp.sac.sk/pub/sac/pack/0index.txt 
+# GRR: this test is still too general as it catches also text files starting with jm
+0	string	jm	
+# only found examples with this additional characteristic 2 bytes
+>2	string	\x2\x4	Xpack DiskImage archive data
+#!:ext xdi
 # XPack Data
-0	string	xpa XPack archive data
+# *.xpa updated by Joerg Jenderek Sep 2015
+# ftp://ftp.elf.stuba.sk/pub/pc/pack/
+0	string	xpa	XPA
+#!:ext	xpa
+# XPA32
+# ftp://ftp.elf.stuba.sk/pub/pc/pack/xpa32.zip
+# created by XPA32.EXE version 1.0.2 for Windows
+>0	string	xpa\0\1 \b32 archive data
+# created by XPACK.COM version 1.67m or 1.67r with short 0x1800 
+>3	ubeshort	!0x0001	\bck archive data
 # XPack Single Data
-0	string	\xc3\x8d\ jm XPack single archive data
+# changed by Joerg Jenderek Sep 2015 back to like in version 5.12
+# letter 'I'+ acute accent is equivalent to \xcd
+0	string	\xcd\ jm	Xpack single archive data
+#!:mime	application/x-xpa-compressed
+#!:ext xpa
 
 # TODO: missing due to unknown magic/magic at end of file:
 #DWC
@@ -716,7 +734,7 @@
 >>>4	byte		0x0a		\b, at least v1.0 to extract
 >>>4	byte		0x0b		\b, at least v1.1 to extract
 >>>4	byte		0x14		\b, at least v2.0 to extract
->>>4	byte		0x2d		\b, at least v3.0 to extract
+>>>4	byte		0x2d		\b, at least v4.5 to extract
 >>>0x161	string		WINZIP		\b, WinZIP self-extracting
 
 # StarView Metafile
@@ -913,6 +931,9 @@
 # ZPAQ: http://mattmahoney.net/dc/zpaq.html
 0	string	zPQ	ZPAQ stream
 >3	byte	x	\b, level %d
+# From: Barry Carter <carter.barry@gmail.com>
+# http://encode.ru/threads/456-zpaq-updates/page32
+0	string	7kSt	ZPAQ file
 
 # BBeB ebook, unencrypted (LRF format)
 # URL: http://www.sven.de/librie/Librie/LrfFormat
@@ -956,40 +977,9 @@
 >0xE08	search/7776		\x55\xAA	
 >>&-512	indirect		x		\b; contains 
 
-# Symantec GHOST image by Joerg Jenderek at May 2014
-# http://us.norton.com/ghost/
-# http://www.garykessler.net/library/file_sigs.html
-0		ubelong&0xFFFFf7f0	0xFEEF0100	Norton GHost image
-# *.GHO
->2		ubyte&0x08		0x00		\b, first file
-# *.GHS or *.[0-9] with cns program option
->2		ubyte&0x08		0x08		\b, split file
-# part of split index interesting for *.ghs
->>4		ubyte			x		id=0x%x
-# compression tag minus one equals numeric compression command line switch z[1-9]
->3		ubyte			0		\b, no compression
->3		ubyte			2		\b, fast compression (Z1)
->3		ubyte			3		\b, medium compression (Z2)
->3		ubyte			>3		
->>3		ubyte			<11		\b, compression (Z%d-1)
->2		ubyte&0x08		0x00		
-# ~ 30 byte password field only for *.gho
->>12		ubequad			!0		\b, password protected
->>44		ubyte			!1		
-# 1~Image All, sector-by-sector only for *.gho
->>>10		ubyte			1		\b, sector copy
-# 1~Image Boot track only for *.gho
->>>43		ubyte			1		\b, boot track
-# 1~Image Disc only for *.gho implies Image Boot track and sector copy
->>44		ubyte			1		\b, disc sector copy
-# optional image description only *.gho
->>0xff		string			>\0		"%-.254s"
-# look for DOS sector end sequence
->0xE08	search/7776		\x55\xAA	
->>&-512	indirect		x		\b; contains 
 
 #------------------------------------------------------------------------------
-# $File: compress,v 1.57 2014/04/30 21:41:02 christos Exp $
+# $File: compress,v 1.63 2015/03/11 19:27:35 christos Exp $
 # compress:  file(1) magic for pure-compression formats (no archives)
 #
 # compress, gzip, pack, compact, huf, squeeze, crunch, freeze, yabba, etc.
@@ -1191,6 +1181,7 @@
 
 # http://tukaani.org/xz/xz-file-format.txt
 0	ustring		\xFD7zXZ\x00		xz compressed data
+!:strength * 2
 !:mime	application/x-xz
 
 # https://github.com/ckolivas/lrzip/blob/master/doc/magic.header.txt
@@ -1240,9 +1231,20 @@
 # Snappy framing format
 # http://code.google.com/p/snappy/source/browse/trunk/framing_format.txt
 0	string	\377\006\0\0sNaPpY	snappy framed data
+!:mime	application/x-snappy-framed
+
+# qpress, http://www.quicklz.com/
+0	string	qpress10	qpress compressed data
+!:mime	application/x-qpress
+
+# Zlib https://www.ietf.org/rfc/rfc6713.txt
+0	string/b	x
+>0	beshort%31	=0	
+>>0	byte&0xf	=8
+>>>0	byte&0x80 	=0	zlib compressed data
 
 #------------------------------------------------------------
-# $File: android,v 1.3 2013/11/08 01:24:22 christos Exp $
+# $File: android,v 1.7 2014/11/10 05:08:23 christos Exp $
 # Various android related magic entries
 #------------------------------------------------------------
 
@@ -1257,21 +1259,11 @@
 >0	regex	dey\n[0-9]{2}\0	Dalvik dex file (optimized for host)
 >4	string	>000			version %s
 
-# http://android.stackexchange.com/questions/23357/\
-# is-there-a-way-to-look-inside-and-modify-an-adb-backup-created-file/\
-# 23608#23608
-0	string	ANDROID\040BACKUP\n	Android Backup
->15	string	1\n			\b, version 1
->17	string	0\n			\b, uncompressed
->17	string	1\n			\b, compressed
->19	string	none\n			\b, unencrypted
->19	string	AES-256\n		\b, encrypted AES-256
-
 # Android bootimg format
 # From https://android.googlesource.com/\
 # platform/system/core/+/master/mkbootimg/bootimg.h
 0		string	ANDROID!	Android bootimg
->1024	string	LOKI1		b, LOKI'd
+>1024	string	LOKI\01		\b, LOKI'd
 >8		lelong	>0			\b, kernel
 >>12	lelong	>0			\b (0x%x)
 >16		lelong	>0			\b, ramdisk
@@ -1281,3 +1273,45 @@
 >36		lelong	>0			\b, page size: %d
 >38		string	>0			\b, name: %s
 >64		string	>0		 	\b, cmdline (%s)
+
+# Android Backup archive
+# From: Ariel Shkedi
+# File extension: .ab
+# No mime-type defined
+# URL: https://github.com/android/platform_frameworks_base/blob/\
+# 0bacfd2ba68d21a68a3df345b830bc2a1e515b5a/services/java/com/\
+# android/server/BackupManagerService.java#L2367
+# After the header comes a tar file
+# If compressed, the entire tar file is compressed with JAVA deflate
+#
+# Include the version number hardcoded with the magic string to avoid
+# false positives
+0	string/b	ANDROID\ BACKUP\n1\n	Android Backup
+>17	string		0\n			\b, Not-Compressed
+>17	string		1\n			\b, Compressed
+# any string as long as it's not the word none (which is matched below)
+>>19    regex/1l	\^([^n\n]|n[^o]|no[^n]|non[^e]|none.+).*	\b, Encrypted (%s)
+>>19	string		none\n			\b, Not-Encrypted
+# Commented out because they don't seem useful to print
+# (but they are part of the header - the tar file comes after them):
+#>>>&1		regex/1l .*	\b, Password salt: %s
+#>>>>&1		regex/1l .*	\b, Master salt: %s
+#>>>>>&1	regex/1l .*	\b, PBKDF2 rounds: %s
+#>>>>>>&1	regex/1l .*	\b, IV: %s
+#>>>>>>>&1	regex/1l .*	\b, Key: %s
+
+# Android sparse img format
+# From https://android.googlesource.com/\
+# platform/system/core/+/master/libsparse/sparse_format.h
+0		lelong	0xed26ff3a		Android sparse image
+>4		leshort	x			\b, version: %d
+>6		leshort	x			\b.%d
+>16		lelong	x			\b, Total of %d
+>12		lelong	x			\b %d-byte output blocks in
+>20		lelong	x			\b %d input chunks.
+
+# Android binary XML magic
+# In include/androidfw/ResourceTypes.h:
+# RES_XML_TYPE = 0x0003 followed by the size of the header (ResXMLTree_header),
+# which is 8 bytes (2 bytes type + 2 bytes header size + 4 bytes size).
+0	lelong	0x00080003	Android binary XML

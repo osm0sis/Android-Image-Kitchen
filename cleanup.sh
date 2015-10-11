@@ -5,5 +5,5 @@
 cd "$PWD";
 rm -rf ramdisk split_img *new.*;
 echo "Working directory cleaned.";
-return 0;
+exit 0;
 
