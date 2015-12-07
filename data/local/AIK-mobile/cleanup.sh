@@ -3,7 +3,7 @@
 # osm0sis @ xda-developers
 
 case $0 in
-  /system/bin/sh|sh)
+  /system/bin/sh|sh|tmp-mksh|sush)
     echo "Please run without using the source command.";
     echo "Example: sh ./cleanup.sh";
     return 1;;

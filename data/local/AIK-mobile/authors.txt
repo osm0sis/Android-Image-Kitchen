@@ -9,7 +9,8 @@ https://github.com/trevd/android_system_core_cpio/ (makefile)
 https://github.com/osm0sis/mkbootfs/ (patches)
 
 busybox:
-http://www.bitcubatex.com/apps/
+http://busybox.net/ (initial source)
+https://github.com/osm0sis/android-busybox-ndk (patches)
 
 file, magic:
 http://www.darwinsys.com/file/
@@ -18,7 +19,7 @@ xz:
 http://tukaani.org/xz/
 
 lz4:
-http://code.google.com/p/lz4/
+http://cyan4973.github.io/lz4/
 
 shell scripts:
 osm0sis@xda-developers (scripting)

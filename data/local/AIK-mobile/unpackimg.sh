@@ -3,14 +3,25 @@
 # osm0sis @ xda-developers
 
 case $0 in
-  /system/bin/sh|sh)
+  /system/bin/sh|sh|tmp-mksh|sush)
     echo "Please run without using the source command.";
     echo "Example: sh ./unpackimg.sh boot.img";
     return 1;;
 esac;
 
 cleanup() { rm -rf ramdisk split_img *new.*; }
-abort() { cd "$PWD"; echo "Error!"; }
+abort() { cd "$aik"; echo "Error!"; }
+
+aik="$PWD";
+bin="$aik/bin";
+bb="$bin/busybox";
+chmod -R 755 "$bin" "$aik"/*.sh;
+chmod 644 "$bin/magic";
+cd "$aik";
+
+if [ ! -f $bb ]; then
+  bb=busybox;
+fi;
 
 if [ ! "$1" -o ! -f "$1" ]; then
   echo "No image file supplied.";
@@ -18,28 +29,11 @@ if [ ! "$1" -o ! -f "$1" ]; then
   return 1;
 fi;
 
-case $1 in
-  *\ *)
-    echo "Filename contains spaces.";
-    abort;
-    return 1;;
-esac;
-
-bin="$PWD/bin";
-bb="$bin/busybox";
-chmod -R 755 "$bin" "$PWD"/*.sh;
-chmod 644 "$bin/magic";
-cd "$PWD";
-
-if [ ! -f $bb ]; then
-  bb=busybox;
-fi;
-
 clear;
 echo "\nAndroid Image Kitchen - UnpackImg Script";
 echo "by osm0sis @ xda-developers\n";
 
-file=`$bb basename "$1"`;
+file=$($bb basename "$1");
 echo "Supplied image: $file\n";
 
 if [ -d split_img -o -d ramdisk ]; then
@@ -59,7 +53,7 @@ if [ $? != "0" ]; then
 fi;
 
 cd split_img;
-$bin/file -m $bin/magic *-ramdisk.gz | $bb cut -d: -f2 | $bb cut -d" " -f2 > "$file-ramdiskcomp";
+$bin/file -m $bin/magic *-ramdisk.gz | $bb cut -d: -f2 | $bb awk '{ print $1 }' > "$file-ramdiskcomp";
 ramdiskcomp=`cat *-ramdiskcomp`;
 unpackcmd="$bb $ramdiskcomp -dc";
 compext=$ramdiskcomp;

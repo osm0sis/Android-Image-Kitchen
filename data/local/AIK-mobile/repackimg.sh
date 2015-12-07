@@ -3,19 +3,20 @@
 # osm0sis @ xda-developers
 
 case $0 in
-  /system/bin/sh|sh)
+  /system/bin/sh|sh|tmp-mksh|sush)
     echo "Please run without using the source command.";
     echo "Example: sh ./repackimg.sh boot.img";
     return 1;;
 esac;
 
-abort() { cd "$PWD"; echo "Error!"; }
+abort() { cd "$aik"; echo "Error!"; }
 
-bin="$PWD/bin";
+aik="$PWD";
+bin="$aik/bin";
 bb="$bin/busybox";
-chmod -R 755 "$bin" "$PWD"/*.sh;
+chmod -R 755 "$bin" "$aik"/*.sh;
 chmod 644 "$bin/magic";
-cd "$PWD";
+cd "$aik";
 
 if [ ! -f $bb ]; then
   bb=busybox;
@@ -49,7 +50,7 @@ case $1 in
       level=-1;
     fi;
     echo "Using compression: $ramdiskcomp$lvltxt";
-    repackcmd="$ramdiskcomp $level";
+    repackcmd="$bb $ramdiskcomp $level";
     compext=$ramdiskcomp;
     case $ramdiskcomp in
       gzip) compext=gz;;
