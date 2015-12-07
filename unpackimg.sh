@@ -3,7 +3,19 @@
 # osm0sis @ xda-developers
 
 cleanup() { rm -rf ramdisk split_img *new.*; }
-abort() { cd "$PWD"; echo "Error!"; }
+abort() { cd "$aik"; echo "Error!"; }
+
+case $1 in
+  --sudo) sudo=sudo; sumsg=" (as root)"; shift;;
+esac;
+
+aik="$(cd "$(dirname "$0")"; pwd)";
+bin="$aik/bin";
+chmod -R 755 "$bin" "$aik"/*.sh;
+chmod 644 "$bin/magic";
+cd "$aik";
+
+arch=`uname -m`;
 
 if [ ! "$1" -o ! -f "$1" ]; then
   echo "No image file supplied.";
@@ -11,27 +23,13 @@ if [ ! "$1" -o ! -f "$1" ]; then
   exit 1;
 fi;
 
-case $1 in
-  *\ *)
-    echo "Filename contains spaces.";
-    abort;
-    exit 1;;
-esac;
-
-bin="$PWD/bin";
-chmod -R 755 "$bin" "$PWD"/*.sh;
-chmod 644 "$bin/magic";
-cd "$PWD";
-
-arch=`uname -m`;
-
 clear;
 echo " ";
 echo "Android Image Kitchen - UnpackImg Script";
 echo "by osm0sis @ xda-developers";
 echo " ";
 
-file=`basename "$1"`;
+file=$(basename "$1");
 echo "Supplied image: $file";
 echo " ";
 
@@ -46,7 +44,7 @@ echo " ";
 mkdir split_img ramdisk;
 
 echo 'Splitting image to "split_img/"...';
-$bin/$arch/unpackbootimg -i "$1" -o split_img;
+"$bin/$arch/unpackbootimg" -i "$1" -o split_img;
 if [ ! $? -eq "0" ]; then
   cleanup;
   abort;
@@ -54,7 +52,7 @@ if [ ! $? -eq "0" ]; then
 fi;
 
 cd split_img;
-file -m $bin/magic *-ramdisk.gz | cut -d: -f2 | cut -d" " -f2 > "$file-ramdiskcomp";
+file -m "$bin/magic" *-ramdisk.gz | cut -d: -f2 | awk '{ print $1 }' > "$file-ramdiskcomp";
 ramdiskcomp=`cat *-ramdiskcomp`;
 unpackcmd="$ramdiskcomp -dc";
 compext=$ramdiskcomp;
@@ -74,7 +72,7 @@ mv "$file-ramdisk.gz" "$file-ramdisk.cpio$compext";
 cd ..;
 
 echo " ";
-echo 'Unpacking ramdisk to "ramdisk/"...';
+echo "Unpacking ramdisk$sumsg to \"ramdisk/\"...";
 echo " ";
 cd ramdisk;
 echo "Compression used: $ramdiskcomp";
@@ -82,7 +80,7 @@ if [ ! "$compext" ]; then
   abort;
   exit 1;
 fi;
-$unpackcmd "../split_img/$file-ramdisk.cpio$compext" $extra | cpio -i;
+$unpackcmd "../split_img/$file-ramdisk.cpio$compext" $extra | $sudo cpio -i;
 if [ ! $? -eq "0" ]; then
   abort;
   exit 1;

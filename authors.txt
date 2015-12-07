@@ -3,14 +3,19 @@ https://github.com/CyanogenMod/android_system_core/tree/cm-10.2/mkbootimg/ (init
 https://github.com/huaixzk/unpackbootimg/ (makefiles)
 https://github.com/osm0sis/mkbootimg/ (patches)
 
+mkbootfs:
+https://github.com/CyanogenMod/android_system_core/tree/cm-11.0/cpio/ (initial source)
+https://github.com/trevd/android_system_core_cpio/ (makefile)
+https://github.com/osm0sis/mkbootfs/ (patches)
+
 lz4:
-http://code.google.com/p/lz4/
+http://cyan4973.github.io/lz4/
 
 magic:
 http://www.darwinsys.com/file/
 
-gzip, bzip2, lzop, xz; basename, cpio, file, find:
-(required system packages)
+gzip, bzip2, lzop, xz; awk, basename, cut, cpio, dirname, file, find, sudo:
+(required system packages/commands)
 
 shell scripts:
 osm0sis@xda-developers (scripting)
