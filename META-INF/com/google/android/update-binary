@@ -5,6 +5,9 @@
 OUTFD=/proc/self/fd/$2;
 ZIP="$3";
 ui_print() { echo -e "ui_print $1\nui_print" > $OUTFD; }
+show_progress() { echo "progress $1 $2" > $OUTFD; }
+set_progress() { echo "set_progress $1" > $OUTFD; }
+file_getprop() { grep "^$2" "$1" | cut -d= -f2; }
 set_perm() {
   files=$(echo $* | awk '{ print substr($0, index($0,$4)) }');
   for i in $files; do
@@ -20,9 +23,6 @@ set_perm_recursive() {
     find "$i" -type f -exec chmod $4 {} +;
   done;
 }
-show_progress() { echo "progress $1 $2" > $OUTFD; }
-set_progress() { echo "set_progress $1" > $OUTFD; }
-file_getprop() { grep "^$2" "$1" | cut -d= -f2; }
 abort() {
   ui_print " ";
   ui_print "Your system has not been changed.";
@@ -30,6 +30,8 @@ abort() {
   ui_print "Script will now exit...";
   ui_print " ";
   umount /system;
+  umount /data;
+  umount /cache;
   exit 1;
 }
 
@@ -41,8 +43,9 @@ show_progress 1.34 0;
 
 ui_print " ";
 ui_print "Mounting...";
-busybox mount -o ro /system;
-busybox mount /data;
+mount -o ro /system;
+mount /data;
+mount /cache;
 set_progress 0.2;
 
 ui_print " ";
@@ -84,10 +87,19 @@ ui_print " ";
 suimg=$(ls /cache/su.img /data/su.img 2>/dev/null);
 if [ "$suimg" ]; then
   test ! -e /su && mkdir /su;
-  busybox mount -t ext4 -o rw,noatime $suimg /su;
+  mount -t ext4 -o rw,noatime $suimg /su;
+  for i in 0 1 2 3 4 5 6 7; do
+    case `mount` in
+      *" /su "*) break;;
+    esac;
+    loop=/dev/block/loop$i;
+    mknod $loop b 7 $i;
+    losetup $loop $suimg;
+    mount -t ext4 -o loop $loop /su;
+  done;
   target=/su/bin;
 else
-  busybox mount -o rw,remount /system;
+  mount -o rw,remount /system;
   target=/system/xbin;
 fi;
 ui_print "Linking helper script $target/aik ...";
@@ -99,6 +111,7 @@ ui_print "Unmounting...";
 umount /su;
 umount /system;
 umount /data;
+umount /cache;
 set_progress 1.2;
 
 ui_print " ";
