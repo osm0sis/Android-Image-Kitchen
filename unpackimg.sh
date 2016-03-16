@@ -2,7 +2,7 @@
 # AIK-Linux/unpackimg: split image and unpack ramdisk
 # osm0sis @ xda-developers
 
-cleanup() { rm -rf ramdisk split_img *new.*; }
+cleanup() { $sudo rm -rf ramdisk split_img *new.*; }
 abort() { cd "$aik"; echo "Error!"; }
 
 case $1 in
