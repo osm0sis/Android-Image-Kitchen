@@ -118,7 +118,7 @@ ui_print " ";
 ui_print "Done!";
 ui_print " ";
 ui_print "Run 'aik' from the commandline when booted";
-ui_print "then './unpackimg.sh -.img' to get started";
+ui_print "then 'unpackimg.sh -.img' to get started";
 set_progress 1.34;
 exit 0;
 

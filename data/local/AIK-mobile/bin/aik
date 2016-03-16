@@ -10,17 +10,17 @@ case $1 in
     if [ -e /su ]; then
       su -c "ln -s $aik/bin/aik /su/bin/aik";
     else
-      su -c "mount -o rw,remount -t auto /system";
-      su -c "rm -f /system/xbin/aik";
-      su -c "ln -s $aik/bin/aik /system/xbin/aik";
-      su -c "mount -o ro,remount -t auto /system";
+      su -c "mount -o rw,remount -t auto /system; \
+             rm -f /system/xbin/aik; \
+             ln -s $aik/bin/aik /system/xbin/aik; \
+             mount -o ro,remount -t auto /system";
     fi;
     echo "aik: symlink restored!";
   ;;
   *)
     # go local and request root
     cd $aik;
-    su;
+    PATH="$PATH:$aik" su;
   ;;
 esac;
 
