@@ -3,20 +3,17 @@
 # osm0sis @ xda-developers
 
 case $0 in
-  /system/bin/sh|sh|tmp-mksh|sush)
-    echo "Please run without using the source command.";
-    echo "Example: sh ./repackimg.sh boot.img";
-    return 1;;
+  *.sh) aik="$0";;
+     *) aik="$(lsof -p $$ | grep -o '/.*repackimg.sh$')";;
 esac;
+aik="$(dirname "$(readlink -f "$aik")")";
 
 abort() { cd "$aik"; echo "Error!"; }
 
-aik="$PWD";
-bin="$aik/bin";
-bb="$bin/busybox";
-chmod -R 755 "$bin" "$aik"/*.sh;
-chmod 644 "$bin/magic";
 cd "$aik";
+bb=bin/busybox;
+chmod -R 755 bin *.sh;
+chmod 644 bin/magic;
 
 if [ ! -f $bb ]; then
   bb=busybox;
@@ -28,7 +25,7 @@ if [ -z "$(ls split_img/* 2> /dev/null)" -o -z "$(ls ramdisk/* 2> /dev/null)" ];
   return 1;
 fi;
 
-clear;
+case $0 in *.sh) clear;; esac;
 echo "\nAndroid Image Kitchen - RepackImg Script";
 echo "by osm0sis @ xda-developers\n";
 
@@ -55,12 +52,12 @@ case $1 in
     case $ramdiskcomp in
       gzip) compext=gz;;
       lzop) compext=lzo;;
-      xz) repackcmd="$bin/xz $level -Ccrc32";;
-      lzma) repackcmd="$bin/xz $level -Flzma";;
+      xz) repackcmd="bin/xz $level -Ccrc32";;
+      lzma) repackcmd="bin/xz $level -Flzma";;
       bzip2) compext=bz2;;
-      lz4) repackcmd="$bin/lz4 $level -l stdin stdout";;
+      lz4) repackcmd="bin/lz4 $level -l stdin stdout";;
     esac;
-    $bin/mkbootfs ramdisk | $repackcmd > ramdisk-new.cpio.$compext;
+    bin/mkbootfs ramdisk | $repackcmd > ramdisk-new.cpio.$compext;
     if [ $? != "0" ]; then
       abort;
       return 1;
@@ -96,7 +93,7 @@ fi;
 cd ..;
 
 echo "\nBuilding image...\n";
-$bin/mkbootimg --kernel "split_img/$kernel" --ramdisk "$ramdisk" $second --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff $secondoff --tags_offset $tagsoff $dtb -o image-new.img;
+bin/mkbootimg --kernel "split_img/$kernel" --ramdisk "$ramdisk" $second --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff $secondoff --tags_offset $tagsoff $dtb -o image-new.img;
 if [ $? != "0" ]; then
   abort;
   return 1;
