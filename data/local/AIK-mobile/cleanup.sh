@@ -4,7 +4,7 @@
 
 case $0 in
   *.sh) aik="$0";;
-     *) aik="$(lsof -p $$ | grep -o '/.*cleanup.sh$')";;
+     *) aik="$(lsof -p $$ 2>/dev/null | grep -o '/.*cleanup.sh$')";;
 esac;
 aik="$(dirname "$(readlink -f "$aik")")";
 

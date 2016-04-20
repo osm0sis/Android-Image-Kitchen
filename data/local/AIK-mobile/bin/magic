@@ -1,7 +1,7 @@
 #------------------------------------------------------------------------------
 # Slimmed down magic file for archives only
 #------------------------------------------------------------------------------
-# $File: archive,v 1.90 2015/04/24 15:44:12 christos Exp $
+# $File: archive,v 1.101 2016/01/08 00:41:02 christos Exp $
 # archive:  file(1) magic for archive formats (see also "msdos" for self-
 #           extracting compressed archives)
 #
@@ -248,7 +248,15 @@
 # BA
 # TODO: idarc says "bytes 0-2 == bytes 3-5"
 # TTComp
-0	string	\0\6 TTComp archive data
+# URL: http://fileformats.archiveteam.org/wiki/TTComp_archive
+# Update: Joerg Jenderek
+# GRR: line below is too general as it matches also Panorama database "TCDB 2003-10 demo.pan", others
+0	string	\0\6 
+# look for first keyword of Panorama database *.pan
+>12	search/261	DESIGN	
+# skip keyword with low entropy
+>12	default		x	TTComp archive, binary, 4K dictionary
+# (version 5.25) labeled the above entry as "TTComp archive data"
 # ESP, could this conflict with Easy Software Products' (e.g.ESP ghostscript) documentation?
 0	string	ESP ESP archive data
 # ZPack
@@ -545,56 +553,11 @@
 >>0x27	lelong		x			serial %08x,
 >>0x36	string		>\0			fstype %.8s
 
-# LHARC/LHA archiver (Greg Roelofs, newt@uchicago.edu)
-2	string		-lh0-		LHarc 1.x/ARX archive data [lh0]
-!:mime	application/x-lharc
-2	string		-lh1-		LHarc 1.x/ARX archive data [lh1]
-!:mime	application/x-lharc
-2	string		-lz4-		LHarc 1.x archive data [lz4]
-!:mime	application/x-lharc
-2	string		-lz5-		LHarc 1.x archive data [lz5]
-!:mime	application/x-lharc
-#	[never seen any but the last; -lh4- reported in comp.compression:]
-2	string		-lzs-		LHa/LZS archive data [lzs]
-!:mime	application/x-lha
-2	string		-lh\40-		LHa 2.x? archive data [lh ]
-!:mime	application/x-lha
-2	string		-lhd-		LHa 2.x? archive data [lhd]
-!:mime	application/x-lha
-2	string		-lh2-		LHa 2.x? archive data [lh2]
-!:mime	application/x-lha
-2	string		-lh3-		LHa 2.x? archive data [lh3]
-!:mime	application/x-lha
-2	string		-lh4-		LHa (2.x) archive data [lh4]
-!:mime	application/x-lha
-2	string		-lh5-		LHa (2.x) archive data [lh5]
-!:mime	application/x-lha
-2	string		-lh6-		LHa (2.x) archive data [lh6]
-!:mime	application/x-lha
-2	string		-lh7-		LHa (2.x)/LHark archive data [lh7]
-!:mime	application/x-lha
->20	byte		x		- header level %d
-# taken from idarc [JW]
-2   string      -lZ         PUT archive data
-2   string      -lz         LZS archive data
-2   string      -sw1-       Swag archive data
-
-# RAR archiver (Greg Roelofs, newt@uchicago.edu)
-0	string		Rar!		RAR archive data,
+# Very old RAR archive
+# http://jasonblanks.com/wp-includes/images/papers/KnowyourarchiveRAR.pdf
+0	string		RE\x7e\x5e  RAR archive data (<v1.5)
 !:mime	application/x-rar
->44	byte		x		v%0x,
->10	byte		>0		flags:
->>10	byte		&0x01		Archive volume,
->>10	byte		&0x02		Commented,
->>10	byte		&0x04		Locked,
->>10	byte		&0x08		Solid,
->>10	byte		&0x20		Authenticated,
->35	byte		0		os: MS-DOS
->35	byte		1		os: OS/2
->35	byte		2		os: Win32
->35	byte		3		os: Unix
-# some old version? idarc says:
-0   string      RE\x7e\x5e  RAR archive data
+#!:ext	rar/cbr
 
 # SQUISH archiver (Greg Roelofs, newt@uchicago.edu)
 0	string		SQSH		squished archive data (Acorn RISCOS)
@@ -606,9 +569,12 @@
 # PKZIP multi-volume archive
 0	string		PK\x07\x08PK\x03\x04	Zip multi-volume archive data, at least PKZIP v2.50 to extract
 !:mime	application/zip
+#!:ext zip/cbz
 
 # Zip archives (Greg Roelofs, c/o zip-bugs@wkuvx1.wku.edu)
 0	string		PK\005\006	Zip archive data (empty)
+!:mime application/zip
+#!:ext zip/cbz
 0	string		PK\003\004
 
 # Specialised zip formats which start with a member named 'mimetype'
@@ -765,14 +731,6 @@
 #
 0       string  \0\ \ \ \ \ \ \ \ \ \ \ \0\0    LBR archive data
 #
-# PMA (CP/M derivative of LHA)
-#
-2       string          -pm0-           PMarc archive data [pm0]
-2       string          -pm1-           PMarc archive data [pm1]
-2       string          -pm2-           PMarc archive data [pm2]
-2       string          -pms-           PMarc SFX archive (CP/M, DOS)
-5       string          -pc1-           PopCom compressed executable (CP/M)
-
 # From Rafael Laboissiere <rafael@laboissiere.net>
 # The Project Revision Control System (see
 # http://prcs.sourceforge.net) generates a packaged project
@@ -803,6 +761,9 @@
 
 # Felix von Leitner <felix-file@fefe.de>
 0	string	d8:announce	BitTorrent file
+!:mime	application/x-bittorrent
+# Durval Menezes, <jmgthbfile at durval dot com>
+0	string	d13:announce-list	BitTorrent file
 !:mime	application/x-bittorrent
 
 # Atari MSA archive - Teemu Hukkanen <tjhukkan@iki.fi>
@@ -891,19 +852,16 @@
 # From "Nelson A. de Oliveira" <naoliv@gmail.com>
 0	string	MPQ\032		MoPaQ (MPQ) archive
 
-# From: Dirk Jagdmann <doj@cubic.org>
-# xar archive format: http://code.google.com/p/xar/
-0	string	xar!		xar archive
->6	beshort	x		- version %d
-
 # From: "Nelson A. de Oliveira" <naoliv@gmail.com>
 # .kgb
 0	string KGB_arch		KGB Archiver file
 >10	string x		with compression level %.1s
 
 # xar (eXtensible ARchiver) archive
+# xar archive format: http://code.google.com/p/xar/
 # From: "David Remahl" <dremahl@apple.com>
 0	string	xar!		xar archive
+!:mime	application/x-xar
 #>4	beshort	x		header size %d
 >6	beshort	x		version %d,
 #>8	quad	x		compressed TOC: %d,
@@ -977,9 +935,15 @@
 >0xE08	search/7776		\x55\xAA	
 >>&-512	indirect		x		\b; contains 
 
+# Google Chrome extensions
+# https://developer.chrome.com/extensions/crx
+# https://developer.chrome.com/extensions/hosting
+0	string	Cr24	Google Chrome extension
+!:mime	application/x-chrome-extension
+>4	ulong	x	\b, version %u
 
 #------------------------------------------------------------------------------
-# $File: compress,v 1.63 2015/03/11 19:27:35 christos Exp $
+# $File: compress,v 1.64 2015/07/27 15:41:09 christos Exp $
 # compress:  file(1) magic for pure-compression formats (no archives)
 #
 # compress, gzip, pack, compact, huf, squeeze, crunch, freeze, yabba, etc.
@@ -1168,6 +1132,7 @@
 >6	byte		x			version %d
 >7	byte		x			\b.%d
 !:mime	application/x-7z-compressed
+#!:ext 7z/cb7
 
 # Type: LZMA
 0	lelong&0xffffff	=0x5d
@@ -1244,7 +1209,7 @@
 >>>0	byte&0x80 	=0	zlib compressed data
 
 #------------------------------------------------------------
-# $File: android,v 1.7 2014/11/10 05:08:23 christos Exp $
+# $File: android,v 1.8 2015/03/19 18:04:37 christos Exp $
 # Various android related magic entries
 #------------------------------------------------------------
 

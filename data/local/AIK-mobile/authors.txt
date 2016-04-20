@@ -1,12 +1,12 @@
 unpackbootimg, mkbootimg:
-https://github.com/CyanogenMod/android_system_core/tree/cm-10.2/mkbootimg/ (inital sources)
-https://github.com/huaixzk/unpackbootimg/ (makefiles)
-https://github.com/osm0sis/mkbootimg/ (patches)
+https://github.com/CyanogenMod/android_system_core/tree/cm-10.2/mkbootimg (initial sources)
+https://github.com/huaixzk/unpackbootimg (makefiles)
+https://github.com/osm0sis/mkbootimg (patches)
 
 mkbootfs:
-https://github.com/CyanogenMod/android_system_core/tree/cm-11.0/cpio/ (initial source)
-https://github.com/trevd/android_system_core_cpio/ (makefile)
-https://github.com/osm0sis/mkbootfs/ (patches)
+https://github.com/CyanogenMod/android_system_core/tree/cm-11.0/cpio (initial source)
+https://github.com/trevd/android_system_core_cpio (makefile)
+https://github.com/osm0sis/mkbootfs (patches)
 
 busybox:
 http://busybox.net/ (initial source)
