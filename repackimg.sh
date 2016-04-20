@@ -62,7 +62,6 @@ case $1 in
     esac;
     if [ "$sumsg" ]; then
       cd ramdisk;
-      sudo chown -R root.root *;
       sudo find . | sudo cpio -H newc -o 2> /dev/null | $repackcmd > ../ramdisk-new.cpio.$compext;
       cd ..;
     else
