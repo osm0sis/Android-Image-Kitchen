@@ -90,9 +90,18 @@ echo.
 
 echo Building image . . .
 echo.
+
+if not exist "split_img\*-second" goto skipmkboot_dtb
 %bin%\mkbootimg --kernel "split_img/%kernel%" %ramdisk% %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% %second_offset% --tags_offset %tagsoff% %dtb% -o image-new.img %errout%
 if errorlevel == 1 goto error
 
+goto skipmkboot_end
+
+:skipmkboot_dtb
+%bin%\mkbootimg --kernel "split_img/%kernel%" %ramdisk% %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% %second_offset% --tags_offset %tagsoff% -o image-new.img %errout%
+if errorlevel == 1 goto error
+
+:skipmkboot_end
 echo Done!
 goto end
 
