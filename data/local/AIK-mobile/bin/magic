@@ -1,7 +1,7 @@
 #------------------------------------------------------------------------------
 # Slimmed down magic file for archives only
 #------------------------------------------------------------------------------
-# $File: archive,v 1.101 2016/01/08 00:41:02 christos Exp $
+# $File: archive,v 1.102 2016/01/11 20:59:24 christos Exp $
 # archive:  file(1) magic for archive formats (see also "msdos" for self-
 #           extracting compressed archives)
 #
@@ -691,6 +691,14 @@
 >(26.s+30)	leshort	0xcafe		Java archive data (JAR)
 !:mime	application/java-archive
 
+# iOS App
+>(26.s+30)	leshort	!0xcafe
+>>26		string	!\x8\0\0\0mimetype
+>>>30		string	Payload/
+>>>>38		search/64       .app/   iOS App
+!:mime application/x-ios-app
+
+
 # Generic zip archives (Greg Roelofs, c/o zip-bugs@wkuvx1.wku.edu)
 #   Next line excludes specialized formats:
 >(26.s+30)	leshort	!0xcafe
@@ -943,7 +951,7 @@
 >4	ulong	x	\b, version %u
 
 #------------------------------------------------------------------------------
-# $File: compress,v 1.64 2015/07/27 15:41:09 christos Exp $
+# $File: compress,v 1.65 2015/12/04 20:48:03 christos Exp $
 # compress:  file(1) magic for pure-compression formats (no archives)
 #
 # compress, gzip, pack, compact, huf, squeeze, crunch, freeze, yabba, etc.
@@ -1163,6 +1171,16 @@
 !:mime	application/x-lz4
 0	lelong		0x184c2102	lz4 compressed data (v0.1-v0.9)
 !:mime	application/x-lz4
+
+# Zstandard/LZ4 skippable frames
+# https://github.com/facebook/zstd/blob/dev/zstd_compression_format.md
+0         lelong&0xFFFFFFF0  0x184D2A50
+>(4.l+8)  indirect
+
+# https://github.com/facebook/zstd/blob/dev/zstd_compression_format.md
+0  lelong    0xEC30A437  Zstandard dictionary
+!:mime  application/x-zstd-dictionary
+>4 lelong    x           (ID %u)
 
 # AFX compressed files (Wolfram Kleff)
 2	string		-afx-		AFX compressed file data

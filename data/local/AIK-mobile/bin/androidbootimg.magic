@@ -1,0 +1,35 @@
+#------------------------------------------------------------------------------
+# Various Android OEM non-standard boot image related magic entries
+# osm0sis @ xda-developers
+#------------------------------------------------------------------------------
+
+# Google Pixel/Nexus/AOSP Standard
+# [test "x" as workaround to odd file/magic behavior not allowing search here]
+0		string		x
+>0		search		ANDROID!			AOSP bootimg
+>1024	search		LOKI\x01			\b, LOKI header (recovery)
+>1024	search		LOKI\x00			\b, LOKI header (boot)
+>2048	search		\x88\x16\x88\x58	\b, MTK headers
+
+# Sony ELF
+0		string		\x7fELF				ELF
+>5		string		\x01\x01\x61		bootimg
+>18		string		\x28				(ARM
+>18		string		\x03				(x86_
+>18		string		\x08				(MIPS
+>4		string		\x01				\b)
+>4		string		\x02				\b64)
+>0		search		\x88\x16\x88\x58	\b, MTK headers
+
+# MediaTek MTK
+# [for detection after boot image has already been split]
+0		search		\x88\x16\x88\x58	MTK header
+>0		search		KERNEL				\b, kernel type
+>0		search		ROOTFS				\b, rootfs type
+>0		search		RECOVERY			\b, recovery type
+!:strength / 15
+
+# Qualcomm Device Tree
+# [for detection after boot image has already been split]
+0		string		QCDT				QCDT header
+!:strength / 15

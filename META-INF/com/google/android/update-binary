@@ -9,18 +9,19 @@ show_progress() { echo "progress $1 $2" > $OUTFD; }
 set_progress() { echo "set_progress $1" > $OUTFD; }
 file_getprop() { grep "^$2" "$1" | cut -d= -f2; }
 set_perm() {
-  files=$(echo $* | awk '{ print substr($0, index($0,$4)) }');
-  for i in $files; do
-    chown $1.$2 $i; chown $1:$2 $i;
-    chmod $3 $i;
-  done;
+  uid=$1; gid=$2; mod=$3;
+  shift 3;
+  chown $uid.$gid $*; chown $uid:$gid $*;
+  chmod $mod $*;
 }
 set_perm_recursive() {
-  dirs=$(echo $* | awk '{ print substr($0, index($0,$5)) }');
-  for i in $dirs; do
-    chown -R $1.$2 $i; chown -R $1:$2 $i;
-    find "$i" -type d -exec chmod $3 {} +;
-    find "$i" -type f -exec chmod $4 {} +;
+  uid=$1; gid=$2; dmod=$3; fmod=$4;
+  shift 4;
+  until [ ! "$1" ]; do
+    chown -R $uid.$gid $1; chown -R $uid:$gid $1;
+    find "$1" -type d -exec chmod $dmod {} +;
+    find "$1" -type f -exec chmod $fmod {} +;
+    shift;
   done;
 }
 abort() {
@@ -62,9 +63,10 @@ case $abi in
   arm*|x86*|mips*) ;;
   *) abi=`file_getprop /default.prop ro.product.cpu.abi`;;
 esac;
+test -f /system/system/build.prop && root=/system;
 case $abi in
   arm*|x86*|mips*) ;;
-  *) abi=`file_getprop /system/build.prop ro.product.cpu.abi`;;
+  *) abi=`file_getprop $root/system/build.prop ro.product.cpu.abi`;;
 esac;
 case $abi in
   arm64*) arch=arm64;;
@@ -80,40 +82,48 @@ cp -rf data/* /data;
 cp -rf bin/$arch/* /data/local/AIK-mobile/bin/;
 rm -rf /tmp/aik-mobile;
 set_perm_recursive 0 0 0755 0755 "/data/local/AIK-mobile";
-set_perm 0 0 0644 "/data/local/AIK-mobile/authors.txt" "/data/local/AIK-mobile/bin/magic";
+set_perm 0 0 0644 "/data/local/AIK-mobile/authors.txt" "/data/local/AIK-mobile/bin/androidbootimg.magic" "/data/local/AIK-mobile/bin/magic";
 set_progress 0.8;
 
 ui_print " ";
-suimg=$(ls /cache/su.img /data/su.img 2>/dev/null);
+suimg=$(ls /data/su.img || ls /cache/su.img || ls /data/magisk.img || ls /cache/magisk.img) 2>/dev/null;
+mnt=/$(basename $suimg .img);
 if [ "$suimg" ]; then
-  test ! -e /su && mkdir /su;
-  mount -t ext4 -o rw,noatime $suimg /su;
+  umount $mnt;
+  test ! -e $mnt && mkdir $mnt;
+  mount -t ext4 -o rw,noatime $suimg $mnt;
   for i in 0 1 2 3 4 5 6 7; do
     case `mount` in
-      *" /su "*) break;;
+      *" $mnt "*) break;;
     esac;
     loop=/dev/block/loop$i;
-    mknod $loop b 7 $i;
-    losetup $loop $suimg;
-    mount -t ext4 -o loop $loop /su;
+    if [ ! -f "$loop" -o ! -b "$loop" ]; then
+      mknod $loop b 7 $i;
+    fi;
+    losetup $loop $suimg && mount -t ext4 -o loop $loop $mnt;
   done;
-  target=/su/bin;
+  test $mnt == /magisk && magisk=/aik-mobile/system;
+  target=$mnt$magisk/bin;
 else
   mount -o rw,remount /system;
-  target=/system/xbin;
+  target=$root/system/xbin;
 fi;
-ui_print "Linking helper script $target/aik ...";
-ln -sf "/data/local/AIK-mobile/bin/aik" "$target/aik";
+ui_print "Creating helper script $target/aik ...";
+cp -pf "/data/local/AIK-mobile/bin/aik" "$target/aik";
 set_progress 1.0;
+
+cd /tmp;
+test $magisk && touch /magisk/aik-mobile/auto_mount;
 
 ui_print " ";
 ui_print "Unmounting...";
-umount /su;
+umount $mnt;
 umount /system;
 umount /data;
 umount /cache;
 set_progress 1.2;
 
+rm -rf /tmp/aik-mobile;
 ui_print " ";
 ui_print "Done!";
 ui_print " ";

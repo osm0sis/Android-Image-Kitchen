@@ -2,19 +2,23 @@
 # AIK-mobile/unpackimg: split image and unpack ramdisk
 # osm0sis @ xda-developers
 
+case $1 in
+  --help) echo "usage: unpackimg.sh <file>"; return 1;
+esac;
+
 case $0 in
   *.sh) aik="$0";;
      *) aik="$(lsof -p $$ 2>/dev/null | grep -o '/.*unpackimg.sh$')";;
 esac;
 aik="$(dirname "$(readlink -f "$aik")")";
 
-cleanup() { rm -rf ramdisk split_img *new.*; }
+cleanup() { rm -rf ramdisk split_img *new.* *original.*; }
 abort() { cd "$aik"; echo "Error!"; }
 
 cd "$aik";
 bb=bin/busybox;
 chmod -R 755 bin *.sh;
-chmod 644 bin/magic;
+chmod 644 bin/magic bin/androidbootimg.magic;
 
 if [ ! -f $bb ]; then
   bb=busybox;
@@ -24,9 +28,11 @@ fi;
 
 img="$1";
 if [ ! "$img" ]; then
-  for i in *.img; do
-    test "$i" == "image-new.img" && continue;
-    img="$i"; break;
+  for i in `ls *.elf *.img 2>/dev/null`; do
+    case $i in
+      aboot.img|image-new.img) continue;;
+    esac;
+    img="$aik/$i"; break;
   done;
 fi;
 if [ ! -f "$img" ]; then
@@ -50,16 +56,86 @@ fi;
 echo "Setting up work folders...\n";
 mkdir split_img ramdisk;
 
+imgtest="$(bin/file -m bin/androidbootimg.magic "$img" | $bb cut -d: -f2-)";
+if [ "$(echo $imgtest | $bb awk '{ print $2 }' | $bb cut -d, -f1)" == "bootimg" ]; then
+  echo $imgtest | $bb awk '{ print $1 }' > "split_img/$file-imgtype";
+  imgtype=`cat split_img/$file-imgtype`;
+else
+  cleanup;
+  echo "No image file supplied.";
+  abort;
+  return 1;
+fi;
+echo "Image type: $imgtype\n";
+
+case $imgtype in
+  AOSP) splitcmd="unpackbootimg -i";;
+  ELF) splitcmd="unpackelf -i";;
+esac;
+
+if [ "$(echo $imgtest | $bb awk '{ print $3 }')" == "LOKI" ]; then
+  echo $imgtest | $bb awk '{ print $5 }' | $bb cut -d\( -f2 | $bb cut -d\) -f1 > "split_img/$file-lokitype";
+  lokitype=`cat split_img/$file-lokitype`;
+  echo "Loki patch with \"$lokitype\" type detected, reverting...\n";
+  echo "Warning: A dump of your device's aboot.img is required to re-Loki!\n";
+  bin/loki_tool unlok "$img" "split_img/$file" >/dev/null;
+  img="$file";
+fi;
+
 echo 'Splitting image to "split_img/"...';
-bin/unpackbootimg -i "$img" -o split_img;
+cd split_img;
+../bin/$splitcmd "$img";
 if [ $? != "0" ]; then
   cleanup;
   abort;
   return 1;
 fi;
 
-cd split_img;
-../bin/file -m ../bin/magic *-ramdisk.gz | $rel$bb cut -d: -f2 | $rel$bb awk '{ print $1 }' > "$file-ramdiskcomp";
+if [ -f *-lokitype ]; then
+  mv -f $file ../unlokied-original.img;
+fi;
+
+if [ "$(../bin/file -m ../bin/androidbootimg.magic *-zImage | $rel$bb cut -d: -f2 | $rel$bb awk '{ print $1 }')" == "MTK" ]; then
+  mtk=1;
+  echo "\nMTK header found in zImage, removing...";
+  $rel$bb dd bs=512 skip=1 conv=notrunc if="$file-zImage" of=tempzimg 2>/dev/null;
+  mv -f tempzimg "$file-zImage";
+fi;
+mtktest="$(../bin/file -m ../bin/androidbootimg.magic *-ramdisk*.gz | $rel$bb cut -d: -f2-)";
+mtktype=$(echo $mtktest | $rel$bb awk '{ print $3 }');
+if [ "$(echo $mtktest | $rel$bb awk '{ print $1 }')" == "MTK" ]; then
+  if [ ! "$mtk" ]; then
+    echo "\nWarning: No MTK header found in zImage!";
+    mtk=1;
+  fi;
+  echo "MTK header found in \"$mtktype\" type ramdisk, removing...";
+  $rel$bb dd bs=512 skip=1 conv=notrunc if="$(ls *-ramdisk*.gz)" of=temprd 2>/dev/null;
+  mv -f temprd "$(ls *-ramdisk*.gz)";
+else
+  if [ "$mtk" ]; then
+    if [ ! "$mtktype" ]; then
+      echo 'Warning: No MTK header found in ramdisk, assuming "rootfs" type!';
+      mtktype="rootfs";
+    fi;
+  fi;
+fi;
+test "$mtk" && echo $mtktype > "$file-mtktype";
+
+if [ -f *-dtb ]; then
+  dtbtest="$(../bin/file -m ../bin/androidbootimg.magic *-dtb | $rel$bb cut -d: -f2 | $rel$bb awk '{ print $1 }')";
+  if [ "$imgtype" == "ELF" ]; then
+    case $dtbtest in
+      QCDT|ELF) ;;
+      *) echo "\nNon-QC DTB found, packing zImage and appending...";
+         $rel$bb gzip "$file-zImage";
+         mv -f "$file-zImage.gz" "$file-zImage";
+         cat "$file-dtb" >> "$file-zImage";
+         rm -f "$file-dtb";;
+    esac;
+  fi;
+fi;
+
+../bin/file -m ../bin/magic *-ramdisk*.gz | $rel$bb cut -d: -f2 | $rel$bb awk '{ print $1 }' > "$file-ramdiskcomp";
 ramdiskcomp=`cat *-ramdiskcomp`;
 unpackcmd="$rel$bb $ramdiskcomp -dc";
 compext=$ramdiskcomp;
@@ -69,13 +145,13 @@ case $ramdiskcomp in
   xz) ;;
   lzma) ;;
   bzip2) compext=bz2;;
-  lz4) unpackcmd="../bin/lz4 -dq"; extra="stdout";;
+  lz4) unpackcmd="../bin/lz4 -dq"; compextra="stdout";;
   *) compext="";;
 esac;
 if [ "$compext" ]; then
   compext=.$compext;
 fi;
-mv "$file-ramdisk.gz" "$file-ramdisk.cpio$compext";
+mv "$(ls *-ramdisk*.gz)" "$file-ramdisk.cpio$compext" 2>/dev/null;
 cd ..;
 
 echo '\nUnpacking ramdisk to "ramdisk/"...\n';
@@ -85,7 +161,7 @@ if [ ! "$compext" ]; then
   abort;
   return 1;
 fi;
-$unpackcmd "../split_img/$file-ramdisk.cpio$compext" $extra | $rel$bb cpio -i 2>&1;
+$unpackcmd "../split_img/$file-ramdisk.cpio$compext" $compextra | $rel$bb cpio -i 2>&1;
 if [ $? != "0" ]; then
   abort;
   return 1;
