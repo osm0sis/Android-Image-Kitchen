@@ -41,7 +41,7 @@ if "%ramdiskcomp%" == "lzop" set "repackcmd=lzop %level%" & set "compext=lzo"
 if "%ramdiskcomp%" == "lzma" set "repackcmd=xz -Flzma %level%" & set "compext=lzma"
 if "%ramdiskcomp%" == "xz" set "repackcmd=xz %level% -Ccrc32" & set "compext=xz"
 if "%ramdiskcomp%" == "bzip2" set "repackcmd=bzip2 %level%" & set "compext=bz2"
-if "%ramdiskcomp%" == "lz4" set "repackcmd=lz4 %level% stdin stdout 2>nul" & set "compext=lz4"
+if "%ramdiskcomp%" == "lz4" set "repackcmd=lz4 %level% -l" & set "compext=lz4"
 %bin%\mkbootfs ramdisk %errout% | %bin%\%repackcmd% %errout% > ramdisk-new.cpio.%compext%
 if errorlevel == 1 goto error
 :skipramdisk
@@ -54,6 +54,10 @@ echo kernel = %kernel%
 for /f "delims=" %%a in ('dir /b split_img\*-ramdisk.cpio*') do @set ramdiskname=%%a
 if "%1" == "--original" echo ramdisk = %ramdiskname% & set "ramdisk=--ramdisk "split_img/%ramdiskname%""
 if not "%1" == "--original" set "ramdiskname=ramdisk-new.cpio.%compext%" & set "ramdisk=--ramdisk ramdisk-new.cpio.%compext%"
+if not exist "split_img\*-second" goto skipsecond
+for /f "delims=" %%a in ('dir /b split_img\*-second') do @set second=%%a
+echo second = %second% & set "second=--second "split_img/%second%""
+:skipsecond
 if not exist "split_img\*-cmdline" goto skipcmd
 for /f "delims=" %%a in ('dir /b split_img\*-cmdline') do @set cmdname=%%a
 for /f "delims=" %%a in ('type "split_img\%cmdname%"') do @set cmdline=%%a
@@ -78,6 +82,11 @@ echo kernel_offset = %kerneloff%
 for /f "delims=" %%a in ('dir /b split_img\*-ramdiskoff') do @set roffname=%%a
 for /f "delims=" %%a in ('type "split_img\%roffname%"') do @set ramdiskoff=%%a
 echo ramdisk_offset = %ramdiskoff%
+if not exist "split_img\*-secondoff" goto skipsoff
+for /f "delims=" %%a in ('dir /b split_img\*-secondoff') do @set soffname=%%a
+for /f "delims=" %%a in ('type "split_img\%soffname%"') do @set secondoff=%%a
+:skipsoff
+echo second_offset = %secondoff%
 if not exist "split_img\*-tagsoff" goto skiptags
 for /f "delims=" %%a in ('dir /b split_img\*-tagsoff') do @set toffname=%%a
 for /f "delims=" %%a in ('type "split_img\%toffname%"') do @set tagsoff=%%a
@@ -93,13 +102,6 @@ for /f "delims=" %%a in ('dir /b split_img\*-oslevel') do @set oslname=%%a
 for /f "delims=" %%a in ('type "split_img\%oslname%"') do @set oslvl=%%a
 echo os_patch_level = %oslvl%
 :skiposlvl
-if not exist "split_img\*-second" goto skipsecond
-for /f "delims=" %%a in ('dir /b split_img\*-second') do @set second=%%a
-echo second = %second% & set "second=--second "split_img/%second%""
-for /f "delims=" %%a in ('dir /b split_img\*-secondoff') do @set soffname=%%a
-for /f "delims=" %%a in ('type "split_img\%soffname%"') do @set secondoff=%%a
-echo second_offset = %secondoff% & set "second_offset=--second_offset %secondoff%"
-:skipsecond
 if not exist "split_img\*-dtb" goto skipdtb
 for /f "delims=" %%a in ('dir /b split_img\*-dtb') do @set dtb=%%a
 echo dtb = %dtb% & set "dtb=--dt "split_img/%dtb%""
@@ -126,7 +128,8 @@ echo.
 for /f "delims=" %%a in ('dir /b split_img\*-imgtype') do @set imgtypename=%%a
 for /f "delims=" %%a in ('type "split_img\%imgtypename%"') do @set imgtype=%%a
 if "%imgtype%" == "ELF" set "imgtype=AOSP" & echo Warning: ELF format detected; will be repacked using AOSP format! & echo.
-if "%imgtype%" == "AOSP" set "buildcmd=mkbootimg --kernel "split_img/%kernel%" %ramdisk% %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% %second_offset% --tags_offset "%tagsoff%" --os_version "%osver%" --os_patch_level "%oslvl%" %dtb% -o image-new.img"
+if "%imgtype%" == "AOSP" set "buildcmd=mkbootimg --kernel "split_img/%kernel%" %ramdisk% %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% --second_offset "%secondoff%" --tags_offset "%tagsoff%" --os_version "%osver%" --os_patch_level "%oslvl%" %dtb% -o image-new.img"
+if "%imgtype%" == "CHROMEOS" set "buildcmd=mkbootimg --kernel "split_img/%kernel%" %ramdisk% %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% --second_offset "%secondoff%" --tags_offset "%tagsoff%" --os_version "%osver%" --os_patch_level "%oslvl%" %dtb% -o unsigned-new.img"
 
 echo Building image . . .
 echo.
@@ -135,6 +138,14 @@ echo.
 %bin%\%buildcmd% %errout%
 if errorlevel == 1 goto error
 
+if "%imgtype%" == "CHROMEOS" (
+  echo Signing new image . . .
+  echo.
+  %bin%\futility vbutil_kernel --pack image-new.img --keyblock %bin%/chromeos/kernel.keyblock --signprivate %bin%/chromeos/kernel_data_key.vbprivk --version 1 --vmlinuz unsigned-new.img --bootloader %bin%/chromeos/empty --config %bin%/chromeos/empty --arch arm --flags 0x1
+  if errorlevel == 1 goto error
+)
+
+:skipchrome
 if not exist "split_img\*-lokitype" goto skiploki
 for /f "delims=" %%a in ('dir /b split_img\*-lokitype') do @set lokitypename=%%a
 for /f "delims=" %%a in ('type "split_img\%lokitypename%"') do @set lokitype=%%a
@@ -152,6 +163,17 @@ if exist aboot.img (
 )
 
 :skiploki
+if not exist "split_img\*-tailtype" goto skiptail
+for /f "delims=" %%a in ('dir /b split_img\*-tailtype') do @set tailtypename=%%a
+for /f "delims=" %%a in ('type "split_img\%tailtypename%"') do @set tailtype=%%a
+echo Appending footer . . .
+echo.
+echo Using type: %tailtype%
+echo.
+if "%tailtype%" == "SEAndroid" %bin%\printf 'SEANDROIDENFORCE' >> image-new.img
+if "%tailtype%" == "Bump" %bin%\printf '\x41\xA9\xE4\x67\x74\x4D\x1D\x1B\xA4\x29\xF2\xEC\xEA\x65\x52\x79' >> image-new.img
+
+:skiptail
 echo Done!
 goto end
 
