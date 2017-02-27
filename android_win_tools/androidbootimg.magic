@@ -3,6 +3,9 @@
 # osm0sis @ xda-developers
 #------------------------------------------------------------------------------
 
+# Google ChromeOS
+0		string		CHROMEOS			CHROMEOS bootimg
+
 # Google Pixel/Nexus/AOSP Standard
 # [test "x" as workaround to odd file/magic behavior not allowing search here]
 0		string		x
@@ -10,6 +13,7 @@
 >1024	search		LOKI\x01			\b, LOKI header (recovery)
 >1024	search		LOKI\x00			\b, LOKI header (boot)
 >2048	search		\x88\x16\x88\x58	\b, MTK headers
+!:strength * 2
 
 # Sony ELF
 0		string		\x7fELF				ELF
@@ -20,6 +24,9 @@
 >4		string		\x01				\b)
 >4		string		\x02				\b64)
 >0		search		\x88\x16\x88\x58	\b, MTK headers
+
+# Intel OS
+0		string		$OS$\x00\x00\x01	OS bootimg
 
 # MediaTek MTK
 # [for detection after boot image has already been split]
@@ -32,4 +39,16 @@
 # Qualcomm Device Tree
 # [for detection after boot image has already been split]
 0		string		QCDT				QCDT header
+!:strength / 15
+
+# Samsung SEAndroid
+# [for detection with the tail of the boot image]
+# [test "x" as workaround to odd file/magic behavior not allowing search here]
+0		string		x
+>0		search		SEANDROIDENFORCE	SEAndroid footer
+!:strength / 15
+
+# LG Bump
+# [for detection with the tail of the boot image]
+0		search		\x41\xA9\xE4\x67\x74\x4D\x1D\x1B\xA4\x29\xF2\xEC\xEA\x65\x52\x79	Bump footer
 !:strength / 15

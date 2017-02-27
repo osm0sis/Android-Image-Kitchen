@@ -38,12 +38,14 @@ for /f "delims=" %%a in ('type "%~nx1-imgtype"') do @set imgtest=%%a
 if "%imgtest%" == "bootimg" (
   %bin%\file -m %bin%\androidbootimg.magic "%file%" %errout% | %bin%\cut -d: -f2- %errout% | %bin%\cut -d: -f2 %errout% | %bin%\cut -d" " -f2 %errout% > "%~nx1-imgtype"
   for /f "delims=" %%a in ('type "%~nx1-imgtype"') do @set imgtype=%%a
-) else call "%~p0\cleanup.bat" & goto noargs
+) else call "%~p0\cleanup.bat" & echo Unrecognized format. & goto error
 echo Image type: %imgtype%
 echo.
 
 if "%imgtype%" == "AOSP" set "splitcmd=unpackbootimg -i"
+if "%imgtype%" == "CHROMEOS" set "splitcmd=unpackbootimg -i"
 if "%imgtype%" == "ELF" set "splitcmd=unpackelf -i"
+if not defined splitcmd call "%~p0\cleanup.bat" & echo Unsupported format. & goto error
 
 %bin%\file -m %bin%\androidbootimg.magic "%file%" %errout% | %bin%\cut -d: -f2- %errout% | %bin%\cut -d: -f2 %errout% | %bin%\cut -d" " -f4 %errout% > "%~nx1-lokitype"
 for /f "delims=" %%a in ('type "%~nx1-lokitype"') do @set lokitest=%%a
@@ -56,6 +58,11 @@ if "%lokitest%" == "LOKI" (
   echo.
   set "file=%~nx1"
 ) else del %~nx1-lokitype
+
+%bin%\tail "%file%" 2>nul | %bin%\file -m %bin%\androidbootimg.magic - %errout% | %bin%\cut -d: -f2 %errout% | %bin%\cut -d" " -f2 %errout% > "%~nx1-tailtype"
+for /f "delims=" %%a in ('type "%~nx1-tailtype"') do @set tailtype=%%a
+if not "%tailtype%" == "SEAndroid" if not "%tailtype%" == "Bump" del %~nx1-tailtype
+if exist "*-tailtype" echo Footer with "%tailtype%" type detected. & echo.
 
 echo Splitting image to "split_img/" . . .
 echo.
@@ -109,13 +116,12 @@ del "%~nx1-dtbtest"
 :skipdtbtest
 %bin%\file -m %bin%\magic *-ramdisk*.gz %errout% | %bin%\cut -d: -f2 %errout% | %bin%\cut -d" " -f2 %errout% > "%~nx1-ramdiskcomp"
 for /f "delims=" %%a in ('type "%~nx1-ramdiskcomp"') do @set ramdiskcomp=%%a
-set "compextra= "
 if "%ramdiskcomp%" == "gzip" set "unpackcmd=gzip -dc" & set "compext=gz"
 if "%ramdiskcomp%" == "lzop" set "unpackcmd=lzop -dc" & set "compext=lzo"
 if "%ramdiskcomp%" == "lzma" set "unpackcmd=xz -dc" & set "compext=lzma"
 if "%ramdiskcomp%" == "xz" set "unpackcmd=xz -dc" & set "compext=xz"
 if "%ramdiskcomp%" == "bzip2" set "unpackcmd=bzip2 -dc" & set "compext=bz2"
-if "%ramdiskcomp%" == "lz4" set "unpackcmd=lz4" & set "compextra=stdout 2>nul" & set "compext=lz4"
+if "%ramdiskcomp%" == "lz4" set "unpackcmd=lz4 -dcq" & set "compext=lz4"
 ren *ramdisk*.gz *ramdisk.cpio.%compext%
 cd ..
 
@@ -124,7 +130,7 @@ echo.
 cd ramdisk
 echo Compression used: %ramdiskcomp%
 if "%compext%" == "" goto error
-%bin%\%unpackcmd% "../split_img/%~nx1-ramdisk.cpio.%compext%" %compextra% %errout% | %bin%\cpio -i %errout%
+%bin%\%unpackcmd% "../split_img/%~nx1-ramdisk.cpio.%compext%" %errout% | %bin%\cpio -i %errout%
 if errorlevel == 1 goto error
 %bin%\chmod -fR +rw ../ramdisk ../split_img > nul 2>&1
 echo.
