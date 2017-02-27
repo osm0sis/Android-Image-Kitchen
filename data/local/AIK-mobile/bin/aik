@@ -10,7 +10,8 @@ case $1 in
     if [ -e /su ]; then
       su -c "cp -pf $aik/bin/aik /su/bin/aik";
     elif [ -e /magisk ]; then
-      su -c "cp -pf $aik/bin/aik /magisk/aik-mobile/bin/aik; \
+      su -c "mkdir -p /magisk/aik-mobile/bin; \
+             cp -pf $aik/bin/aik /magisk/aik-mobile/bin/aik; \
              touch /magisk/aik-mobile/auto_mount";
     else
       su -c "mount -o rw,remount -t auto /system; \

@@ -20,6 +20,10 @@ loki_tool:
 https://github.com/djrbliss/loki (initial source)
 https://github.com/osm0sis/lokitool (patches)
 
+futility:
+https://github.com/jcadduono/platform_external_vboot_reference (initial source)
+https://github.com/osm0sis/futility (patches)
+
 busybox:
 http://busybox.net/ (initial source)
 https://github.com/osm0sis/android-busybox-ndk (patches)
@@ -40,3 +44,5 @@ shell scripts:
 osm0sis@xda-developers (scripting)
 Peteragent5, alansj & iridaki@xda-developers (general method)
 SuperR. & tobias.waldvogel@xda-developers (kernel.elf to boot.img general method)
+Chainfire@xda-developers (ChromeOS and SEAndroid general methods)
+cybojenix@xda-developers (Bump general method)

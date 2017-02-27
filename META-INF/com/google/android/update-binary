@@ -80,7 +80,6 @@ esac;
 ui_print "Using architecture: $arch";
 cp -rf data/* /data;
 cp -rf bin/$arch/* /data/local/AIK-mobile/bin/;
-rm -rf /tmp/aik-mobile;
 set_perm_recursive 0 0 0755 0755 "/data/local/AIK-mobile";
 set_perm 0 0 0644 "/data/local/AIK-mobile/authors.txt" "/data/local/AIK-mobile/bin/androidbootimg.magic" "/data/local/AIK-mobile/bin/magic";
 set_progress 0.8;
@@ -102,18 +101,21 @@ if [ "$suimg" ]; then
     fi;
     losetup $loop $suimg && mount -t ext4 -o loop $loop $mnt;
   done;
-  test $mnt == /magisk && magisk=/aik-mobile/system;
+  test "$mnt" == "/magisk" && magisk=/aik-mobile/system;
   target=$mnt$magisk/bin;
 else
   mount -o rw,remount /system;
+  mount /system;
   target=$root/system/xbin;
 fi;
 ui_print "Creating helper script $target/aik ...";
+mkdir -p $target;
 cp -pf "/data/local/AIK-mobile/bin/aik" "$target/aik";
+if [ "$magisk" ]; then
+  cp -f module.prop /magisk/aik-mobile/;
+  touch /magisk/aik-mobile/auto_mount;
+fi;
 set_progress 1.0;
-
-cd /tmp;
-test $magisk && touch /magisk/aik-mobile/auto_mount;
 
 ui_print " ";
 ui_print "Unmounting...";
@@ -123,6 +125,7 @@ umount /data;
 umount /cache;
 set_progress 1.2;
 
+cd /tmp;
 rm -rf /tmp/aik-mobile;
 ui_print " ";
 ui_print "Done!";

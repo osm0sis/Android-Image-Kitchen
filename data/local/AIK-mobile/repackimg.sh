@@ -59,7 +59,7 @@ case $1 in
       xz) repackcmd="bin/xz $level -Ccrc32";;
       lzma) repackcmd="bin/xz $level -Flzma";;
       bzip2) compext=bz2;;
-      lz4) repackcmd="bin/lz4 $level -l stdin stdout";;
+      lz4) repackcmd="bin/lz4 $level -l";;
     esac;
     bin/mkbootfs ramdisk | $repackcmd > ramdisk-new.cpio.$compext;
     if [ $? != "0" ]; then
@@ -78,6 +78,10 @@ if [ "$1" == "--original" ]; then
 else
   ramdisk="ramdisk-new.cpio.$compext";
 fi;
+if [ -f *-second ]; then
+  second=`ls *-second`;             echo "second = $second";
+  second="--second split_img/$second";
+fi;
 if [ -f *-cmdline ]; then
   cmdline=`cat *-cmdline`;          echo "cmdline = $cmdline";
 fi;
@@ -88,6 +92,9 @@ base=`cat *-base`;                  echo "base = $base";
 pagesize=`cat *-pagesize`;          echo "pagesize = $pagesize";
 kerneloff=`cat *-kerneloff`;        echo "kernel_offset = $kerneloff";
 ramdiskoff=`cat *-ramdiskoff`;      echo "ramdisk_offset = $ramdiskoff";
+if [ -f *-secondoff ]; then
+  secondoff=`cat *-secondoff`;      echo "second_offset = $secondoff";
+fi;
 if [ -f *-tagsoff ]; then
   tagsoff=`cat *-tagsoff`;          echo "tags_offset = $tagsoff";
 fi;
@@ -96,12 +103,6 @@ if [ -f *-osversion ]; then
 fi;
 if [ -f *-oslevel ]; then
   oslvl=`cat *-oslevel`;            echo "os_patch_level = $oslvl";
-fi;
-if [ -f *-second ]; then
-  second=`ls *-second`;             echo "second = $second";  
-  second="--second split_img/$second";
-  secondoff=`cat *-secondoff`;      echo "second_offset = $secondoff";
-  secondoff="--second_offset $secondoff";
 fi;
 if [ -f *-dtb ]; then
   dtb=`ls *-dtb`;                   echo "dtb = $dtb";
@@ -133,16 +134,26 @@ fi;
 echo "\nBuilding image...\n";
 echo "Using format: $imgtype\n";
 case $imgtype in
-  AOSP) bin/mkbootimg --kernel "$kernel" --ramdisk "$ramdisk" $second --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff $secondoff --tags_offset "$tagsoff" --os_version "$osver" --os_patch_level "$oslvl" $dtb -o image-new.img;;
+  AOSP) bin/mkbootimg --kernel "$kernel" --ramdisk "$ramdisk" $second --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --os_version "$osver" --os_patch_level "$oslvl" $dtb -o image-new.img;;
+  CHROMEOS) bin/mkbootimg --kernel "$kernel" --ramdisk "$ramdisk" $second --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --os_version "$osver" --os_patch_level "$oslvl" $dtb -o unsigned-new.img;;
 esac;
 if [ $? != "0" ]; then
   abort;
   return 1;
 fi;
 
+if [ "$imgtype" == "CHROMEOS" ]; then
+  echo "Signing new image...\n";
+  bin/futility vbutil_kernel --pack image-new.img --keyblock bin/chromeos/kernel.keyblock --signprivate bin/chromeos/kernel_data_key.vbprivk --version 1 --vmlinuz unsigned-new.img --bootloader bin/chromeos/empty --config bin/chromeos/empty --arch arm --flags 0x1;
+  if [ $? != "0" ]; then
+    abort;
+    exit 1;
+  fi;
+fi;
+
 if [ -f split_img/*-lokitype ]; then
   lokitype=`cat split_img/*-lokitype`;
-  echo "Loki patching new image...\n"
+  echo "Loki patching new image...\n";
   echo "Using type: $lokitype\n";
   mv -f image-new.img unlokied-new.img;
   if [ -f aboot.img ]; then
@@ -157,6 +168,16 @@ if [ -f split_img/*-lokitype ]; then
     abort;
     return 1;
   fi;
+fi;
+
+if [ -f split_img/*-tailtype ]; then
+  tailtype=`cat split_img/*-tailtype`;
+  echo "Appending footer...\n";
+  echo "Using type: $tailtype\n";
+  case $tailtype in
+    SEAndroid) $bb printf 'SEANDROIDENFORCE' >> image-new.img;;
+    Bump) $bb printf '\x41\xA9\xE4\x67\x74\x4D\x1D\x1B\xA4\x29\xF2\xEC\xEA\x65\x52\x79' >> image-new.img;;
+  esac;
 fi;
 
 echo "Done!";

@@ -32,9 +32,10 @@ if [ ! "$img" ]; then
     case $i in
       aboot.img|image-new.img) continue;;
     esac;
-    img="$aik/$i"; break;
+    img="$i"; break;
   done;
 fi;
+img="$(readlink -f "$img")";
 if [ ! -f "$img" ]; then
   echo "No image file supplied.";
   abort;
@@ -62,7 +63,7 @@ if [ "$(echo $imgtest | $bb awk '{ print $2 }' | $bb cut -d, -f1)" == "bootimg" 
   imgtype=`cat split_img/$file-imgtype`;
 else
   cleanup;
-  echo "No image file supplied.";
+  echo "Unrecognized format.";
   abort;
   return 1;
 fi;
@@ -70,8 +71,15 @@ echo "Image type: $imgtype\n";
 
 case $imgtype in
   AOSP) splitcmd="unpackbootimg -i";;
+  CHROMEOS) splitcmd="unpackbootimg -i";;
   ELF) splitcmd="unpackelf -i";;
 esac;
+if [ ! "$splitcmd" ]; then
+  cleanup;
+  echo "Unsupported format.";
+  abort;
+  return 1;
+fi;
 
 if [ "$(echo $imgtest | $bb awk '{ print $3 }')" == "LOKI" ]; then
   echo $imgtest | $bb awk '{ print $5 }' | $bb cut -d\( -f2 | $bb cut -d\) -f1 > "split_img/$file-lokitype";
@@ -81,6 +89,12 @@ if [ "$(echo $imgtest | $bb awk '{ print $3 }')" == "LOKI" ]; then
   bin/loki_tool unlok "$img" "split_img/$file" >/dev/null;
   img="$file";
 fi;
+
+tailtype="$(cat "$img" | $bb tail 2>/dev/null | bin/file -m bin/androidbootimg.magic - | $bb cut -d: -f2 | $bb cut -d" " -f2)";
+case $tailtype in
+  SEAndroid|Bump) echo "Footer with \"$tailtype\" type detected.\n"; echo $tailtype > "split_img/$file-tailtype";;
+  *) ;;
+esac;
 
 echo 'Splitting image to "split_img/"...';
 cd split_img;
@@ -145,7 +159,7 @@ case $ramdiskcomp in
   xz) ;;
   lzma) ;;
   bzip2) compext=bz2;;
-  lz4) unpackcmd="../bin/lz4 -dq"; compextra="stdout";;
+  lz4) unpackcmd="../bin/lz4 -dcq";;
   *) compext="";;
 esac;
 if [ "$compext" ]; then
@@ -161,7 +175,7 @@ if [ ! "$compext" ]; then
   abort;
   return 1;
 fi;
-$unpackcmd "../split_img/$file-ramdisk.cpio$compext" $compextra | $rel$bb cpio -i 2>&1;
+$unpackcmd "../split_img/$file-ramdisk.cpio$compext" | $rel$bb cpio -i 2>&1;
 if [ $? != "0" ]; then
   abort;
   return 1;
