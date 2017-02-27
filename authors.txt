@@ -20,13 +20,17 @@ loki_tool:
 https://github.com/djrbliss/loki (initial source)
 https://github.com/osm0sis/lokitool (patches)
 
+futility:
+https://github.com/jcadduono/platform_external_vboot_reference (initial source)
+https://github.com/osm0sis/futility (patches)
+
 lz4:
 http://lz4.github.io/lz4/
 
 magic:
 http://www.darwinsys.com/file/
 
-gzip, bzip2, lzop, xz; awk, basename, cut, cpio, dd, dirname, file, find, sudo:
+gzip, bzip2, lzop, xz; awk, basename, cpio, cut, dd, dirname, file, find, printf, sudo, tail:
 (required system packages/commands)
 
 androidbootimg.magic:
@@ -36,3 +40,5 @@ shell scripts:
 osm0sis@xda-developers (scripting)
 Peteragent5, alansj & iridaki@xda-developers (general method)
 SuperR. & tobias.waldvogel@xda-developers (kernel.elf to boot.img general method)
+Chainfire@xda-developers (ChromeOS and SEAndroid general methods)
+cybojenix@xda-developers (Bump general method)
