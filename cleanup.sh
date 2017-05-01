@@ -13,7 +13,7 @@ cd "$aik";
 if [ ! -z "$(ls ramdisk/* 2>/dev/null)" ] && [ "$(stat -c %U ramdisk/* | head -n 1)" = "root" ]; then
   sudo=sudo;
 fi;
-$sudo rm -rf ramdisk split_img *new.* *original.*;
+$sudo rm -rf ramdisk split_img *new.*;
 echo "Working directory cleaned.";
 exit 0;
 
