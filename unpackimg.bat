@@ -35,6 +35,22 @@ md ramdisk
 cd split_img
 %bin%\file -m %bin%\androidbootimg.magic "%file%" %errout% | %bin%\cut -d: -f2- %errout% | %bin%\cut -d: -f2 %errout% | %bin%\cut -d" " -f3 %errout% | %bin%\cut -d, -f1 %errout% > "%~nx1-imgtype"
 for /f "delims=" %%a in ('type "%~nx1-imgtype"') do @set imgtest=%%a
+if "%imgtest%" == "signing" (
+  %bin%\file -m %bin%\androidbootimg.magic "%file%" %errout% | %bin%\cut -d: -f2- %errout% | %bin%\cut -d: -f2 %errout% | %bin%\cut -d" " -f2 %errout% > "%~nx1-sigtype"
+  for /f "delims=" %%a in ('type "%~nx1-sigtype"') do @set "sigtype=%%a" & echo Signature with "%%a" type detected, removing . . .
+  echo.
+)
+if "%sigtype%" == "CHROMEOS" %bin%\futility vbutil_kernel --get-vmlinuz "%file%" --vmlinuz-out "%~nx1" %errout% & set "file=%~nx1"
+if "%sigtype%" == "BLOB" (
+  copy /b "%file%" . >nul
+  %bin%\blobunpack "%~nx1" | %bin%\tail -n+5 | %bin%\cut -d" " -f2 | %bin%\dd bs=1 count=3 > "%~nx1-blobtype" 2>nul
+  move /y "%~nx1.LNX" %~nx1 >nul 2>&1
+  move /y "%~nx1.SOS" %~nx1 >nul 2>&1
+  set "file=%~nx1"
+)
+
+%bin%\file -m %bin%\androidbootimg.magic "%file%" %errout% | %bin%\cut -d: -f2- %errout% | %bin%\cut -d: -f2 %errout% | %bin%\cut -d" " -f3 %errout% | %bin%\cut -d, -f1 %errout% > "%~nx1-imgtype"
+for /f "delims=" %%a in ('type "%~nx1-imgtype"') do @set imgtest=%%a
 if "%imgtest%" == "bootimg" (
   %bin%\file -m %bin%\androidbootimg.magic "%file%" %errout% | %bin%\cut -d: -f2- %errout% | %bin%\cut -d: -f2 %errout% | %bin%\cut -d" " -f2 %errout% > "%~nx1-imgtype"
   for /f "delims=" %%a in ('type "%~nx1-imgtype"') do @set imgtype=%%a
@@ -43,7 +59,6 @@ echo Image type: %imgtype%
 echo.
 
 if "%imgtype%" == "AOSP" set "splitcmd=unpackbootimg -i"
-if "%imgtype%" == "CHROMEOS" set "splitcmd=unpackbootimg -i"
 if "%imgtype%" == "ELF" set "splitcmd=unpackelf -i"
 if not defined splitcmd call "%~p0\cleanup.bat" & echo Unsupported format. & goto error
 
@@ -69,8 +84,6 @@ echo.
 %bin%\%splitcmd% "%file%"
 if errorlevel == 1 call "%~p0\cleanup.bat" & goto error
 echo.
-
-if "%lokitest%" == "LOKI" move /y "%~nx1" "../unlokied-original.img" >nul
 
 %bin%\file -m %bin%\androidbootimg.magic *-zImage %errout% | %bin%\cut -d: -f2 %errout% | %bin%\cut -d" " -f2 %errout% > "%~nx1-mtktest"
 for /f "delims=" %%a in ('type "%~nx1-mtktest"') do @set mtktest=%%a
