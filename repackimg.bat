@@ -28,8 +28,8 @@ for /f "delims=" %%a in ('dir /b split_img\*-ramdiskcomp') do @set ramdiskcname=
 for /f "delims=" %%a in ('type "split_img\%ramdiskcname%"') do @set ramdiskcomp=%%a
 
 if "%1" == "--level" if not [%2] == [] (
-  if "%ramdiskcomp%" == "lz4" ( set "level=-c%2" ) else ( set "level=-%2" )
   set "lvltxt= - Level: %2"
+  set "level=-%2"
 ) else (
   set lvltxt=
   set level=
@@ -102,6 +102,12 @@ for /f "delims=" %%a in ('dir /b split_img\*-oslevel') do @set oslname=%%a
 for /f "delims=" %%a in ('type "split_img\%oslname%"') do @set oslvl=%%a
 echo os_patch_level = %oslvl%
 :skiposlvl
+if not exist "split_img\*-hash" goto skiphash
+for /f "delims=" %%a in ('dir /b split_img\*-hash') do @set hashname=%%a
+for /f "delims=" %%a in ('type "split_img\%hashname%"') do @set hash=%%a
+echo hash = %hash% & set "hash=--hash %hash%"
+:skiphash
+
 if not exist "split_img\*-dtb" goto skipdtb
 for /f "delims=" %%a in ('dir /b split_img\*-dtb') do @set dtb=%%a
 echo dtb = %dtb% & set "dtb=--dt "split_img/%dtb%""
@@ -125,11 +131,14 @@ set "ramdisk=--ramdisk "%mtktype%-new.mtk""
 echo.
 
 :skipmtk
+if exist "split_img\*-sigtype" (
+  set "outname=unsigned-new.img"
+) else set "outname=image-new.img"
 for /f "delims=" %%a in ('dir /b split_img\*-imgtype') do @set imgtypename=%%a
 for /f "delims=" %%a in ('type "split_img\%imgtypename%"') do @set imgtype=%%a
 if "%imgtype%" == "ELF" set "imgtype=AOSP" & echo Warning: ELF format detected; will be repacked using AOSP format! & echo.
-if "%imgtype%" == "AOSP" set "buildcmd=mkbootimg --kernel "split_img/%kernel%" %ramdisk% %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% --second_offset "%secondoff%" --tags_offset "%tagsoff%" --os_version "%osver%" --os_patch_level "%oslvl%" %dtb% -o image-new.img"
-if "%imgtype%" == "CHROMEOS" set "buildcmd=mkbootimg --kernel "split_img/%kernel%" %ramdisk% %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% --second_offset "%secondoff%" --tags_offset "%tagsoff%" --os_version "%osver%" --os_patch_level "%oslvl%" %dtb% -o unsigned-new.img"
+if "%imgtype%" == "AOSP" set "buildcmd=mkbootimg --kernel "split_img/%kernel%" %ramdisk% %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% --second_offset "%secondoff%" --tags_offset "%tagsoff%" --os_version "%osver%" --os_patch_level "%oslvl%" %hash% %dtb% -o %outname%"
+if errorlevel == 1 goto error
 
 echo Building image . . .
 echo.
@@ -138,14 +147,27 @@ echo.
 %bin%\%buildcmd% %errout%
 if errorlevel == 1 goto error
 
-if "%imgtype%" == "CHROMEOS" (
-  echo Signing new image . . .
-  echo.
-  %bin%\futility vbutil_kernel --pack image-new.img --keyblock %bin%/chromeos/kernel.keyblock --signprivate %bin%/chromeos/kernel_data_key.vbprivk --version 1 --vmlinuz unsigned-new.img --bootloader %bin%/chromeos/empty --config %bin%/chromeos/empty --arch arm --flags 0x1
-  if errorlevel == 1 goto error
+if not exist "split_img\*-sigtype" goto skipsign
+for /f "delims=" %%a in ('dir /b split_img\*-sigtype') do @set sigtypename=%%a
+for /f "delims=" %%a in ('type "split_img\%sigtypename%"') do @set sigtype=%%a
+if not exist "split_img\*-blobtype" goto skipblob
+for /f "delims=" %%a in ('dir /b split_img\*-blobtype') do @set blobtypename=%%a
+for /f "delims=" %%a in ('type "split_img\%blobtypename%"') do @set "blobtype= %%a"
+:skipblob
+echo Signing new image . . .
+echo.
+echo Using signature: %sigtype%%blobtype%
+echo.
+if "%sigtype%" == "CHROMEOS" %bin%\futility vbutil_kernel --pack image-new.img --keyblock %bin%/chromeos/kernel.keyblock --signprivate %bin%/chromeos/kernel_data_key.vbprivk --version 1 --vmlinuz unsigned-new.img --bootloader %bin%/chromeos/empty --config %bin%/chromeos/empty --arch arm --flags 0x1
+if "%sigtype%" == "BLOB" (
+  %bin%\printf '-SIGNED-BY-SIGNBLOB-\00\00\00\00\00\00\00\00' > image-new.img
+  %bin%\blobpack tempblob %blobtype% unsigned-new.img >nul
+  type tempblob >> image-new.img
+  del /q tempblob >nul
 )
+if errorlevel == 1 goto error
 
-:skipchrome
+:skipsign
 if not exist "split_img\*-lokitype" goto skiploki
 for /f "delims=" %%a in ('dir /b split_img\*-lokitype') do @set lokitypename=%%a
 for /f "delims=" %%a in ('type "split_img\%lokitypename%"') do @set lokitype=%%a

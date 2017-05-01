@@ -3,8 +3,11 @@
 # osm0sis @ xda-developers
 #------------------------------------------------------------------------------
 
-# Google ChromeOS
-0		string		CHROMEOS			CHROMEOS bootimg
+# ASUS Blob Signature
+0		string		-SIGNED-BY-SIGNBLOB-	BLOB signing
+
+# Google ChromeOS Signature
+0		string		CHROMEOS			CHROMEOS signing
 
 # Google Pixel/Nexus/AOSP Standard
 # [test "x" as workaround to odd file/magic behavior not allowing search here]
@@ -27,6 +30,9 @@
 
 # Intel OS
 0		string		$OS$\x00\x00\x01	OS bootimg
+
+# DENX U-Boot
+0		string		\x27\x05\x19\x56	U-Boot bootimg
 
 # MediaTek MTK
 # [for detection after boot image has already been split]
