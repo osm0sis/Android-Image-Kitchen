@@ -13,7 +13,7 @@ esac;
 aik="$(dirname "$(readlink -f "$aik")")";
 
 cd "$aik";
-rm -rf ramdisk split_img *new.* *original.*;
+rm -rf ramdisk split_img *new.*;
 echo "Working directory cleaned.";
 return 0;
 

@@ -9,7 +9,7 @@ https://github.com/trevd/android_system_core_cpio (makefile)
 https://github.com/osm0sis/mkbootfs (patches)
 
 unpackelf:
-http://forum.xda-developers.com/xperia-z5/development/root-automatic-repack-stock-kernel-dm-t3301605 (initial source)
+https://github.com/tobiaswaldvogel/and_boot_tools/tree/master/bootimg (initial source)
 https://github.com/osm0sis/unpackelf (patches)
 
 mkmtkhdr:
@@ -17,12 +17,14 @@ https://github.com/omnirom/android_device_oppo_r819/tree/android-4.4/mkmtkbootim
 https://github.com/osm0sis/mkmtkhdr (patches)
 
 loki_tool:
-https://github.com/djrbliss/loki (initial source)
-https://github.com/osm0sis/lokitool (patches)
+https://github.com/djrbliss/loki
 
 futility:
 https://github.com/jcadduono/platform_external_vboot_reference (initial source)
 https://github.com/osm0sis/futility (patches)
+
+blobpack, blobunpack:
+https://github.com/AndroidRoot/BlobTools
 
 busybox:
 http://busybox.net/ (initial source)
@@ -44,5 +46,6 @@ shell scripts:
 osm0sis@xda-developers (scripting)
 Peteragent5, alansj & iridaki@xda-developers (general method)
 SuperR. & tobias.waldvogel@xda-developers (kernel.elf to boot.img general method)
+_that & rayman@xda-developers (boot.blob general method)
 Chainfire@xda-developers (ChromeOS and SEAndroid general methods)
 cybojenix@xda-developers (Bump general method)

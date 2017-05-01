@@ -12,13 +12,13 @@ case $0 in
 esac;
 aik="$(dirname "$(readlink -f "$aik")")";
 
-cleanup() { rm -rf ramdisk split_img *new.* *original.*; }
+cleanup() { rm -rf ramdisk split_img *new.*; }
 abort() { cd "$aik"; echo "Error!"; }
 
 cd "$aik";
 bb=bin/busybox;
 chmod -R 755 bin *.sh;
-chmod 644 bin/magic bin/androidbootimg.magic;
+chmod 644 bin/magic bin/androidbootimg.magic bin/chromeos/*;
 
 if [ ! -f $bb ]; then
   bb=busybox;
@@ -30,7 +30,7 @@ img="$1";
 if [ ! "$img" ]; then
   for i in `ls *.elf *.img 2>/dev/null`; do
     case $i in
-      aboot.img|image-new.img) continue;;
+      aboot.img|image-new.img|unlokied-new.img|unsigned-new.img) continue;;
     esac;
     img="$i"; break;
   done;
@@ -58,6 +58,24 @@ echo "Setting up work folders...\n";
 mkdir split_img ramdisk;
 
 imgtest="$(bin/file -m bin/androidbootimg.magic "$img" | $bb cut -d: -f2-)";
+if [ "$(echo $imgtest | $bb awk '{ print $2 }' | $bb cut -d, -f1)" == "signing" ]; then
+  echo $imgtest | $bb awk '{ print $1 }' > "split_img/$file-sigtype";
+  sigtype=`cat split_img/$file-sigtype`;
+  echo "Signature with \"$sigtype\" type detected, removing...\n";
+  case $sigtype in
+    CHROMEOS) bin/futility vbutil_kernel --get-vmlinuz "$img" --vmlinuz-out split_img/$file;;
+    BLOB)
+      cd split_img;
+      cp -f "$img" $file;
+      ../bin/blobunpack $file | $rel$bb tail -n+5 | $rel$bb cut -d" " -f2 | $rel$bb dd bs=1 count=3 > $file-blobtype 2>/dev/null;
+      mv $file.* $file;
+      cd ..;
+    ;;
+  esac;
+  img="$aik/split_img/$file";
+fi;
+
+imgtest="$(bin/file -m bin/androidbootimg.magic "$img" | $bb cut -d: -f2-)";
 if [ "$(echo $imgtest | $bb awk '{ print $2 }' | $bb cut -d, -f1)" == "bootimg" ]; then
   echo $imgtest | $bb awk '{ print $1 }' > "split_img/$file-imgtype";
   imgtype=`cat split_img/$file-imgtype`;
@@ -71,7 +89,6 @@ echo "Image type: $imgtype\n";
 
 case $imgtype in
   AOSP) splitcmd="unpackbootimg -i";;
-  CHROMEOS) splitcmd="unpackbootimg -i";;
   ELF) splitcmd="unpackelf -i";;
 esac;
 if [ ! "$splitcmd" ]; then
@@ -103,10 +120,6 @@ if [ $? != "0" ]; then
   cleanup;
   abort;
   return 1;
-fi;
-
-if [ -f *-lokitype ]; then
-  mv -f $file ../unlokied-original.img;
 fi;
 
 if [ "$(../bin/file -m ../bin/androidbootimg.magic *-zImage | $rel$bb cut -d: -f2 | $rel$bb awk '{ print $1 }')" == "MTK" ]; then

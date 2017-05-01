@@ -17,7 +17,7 @@ abort() { cd "$aik"; echo "Error!"; }
 cd "$aik";
 bb=bin/busybox;
 chmod -R 755 bin *.sh;
-chmod 644 bin/magic bin/androidbootimg.magic;
+chmod 644 bin/magic bin/androidbootimg.magic bin/chromeos/*;
 
 if [ ! -f $bb ]; then
   bb=busybox;
@@ -104,6 +104,10 @@ fi;
 if [ -f *-oslevel ]; then
   oslvl=`cat *-oslevel`;            echo "os_patch_level = $oslvl";
 fi;
+if [ -f *-hash ]; then
+  hash=`cat *-hash`;                 echo "hash = $hash";
+  hash="--hash $hash";
+fi;
 if [ -f *-dtb ]; then
   dtb=`ls *-dtb`;                   echo "dtb = $dtb";
   dtb="--dt split_img/$dtb";
@@ -125,6 +129,12 @@ if [ -f split_img/*-mtktype ]; then
   ramdisk=$mtktype-new.mtk;
 fi;
 
+if [ -f split_img/*-sigtype ]; then
+  outname=unsigned-new.img;
+else
+  outname=image-new.img;
+fi;
+
 imgtype=`cat split_img/*-imgtype`;
 if [ "$imgtype" == "ELF" ]; then
   imgtype=AOSP;
@@ -134,17 +144,29 @@ fi;
 echo "\nBuilding image...\n";
 echo "Using format: $imgtype\n";
 case $imgtype in
-  AOSP) bin/mkbootimg --kernel "$kernel" --ramdisk "$ramdisk" $second --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --os_version "$osver" --os_patch_level "$oslvl" $dtb -o image-new.img;;
-  CHROMEOS) bin/mkbootimg --kernel "$kernel" --ramdisk "$ramdisk" $second --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --os_version "$osver" --os_patch_level "$oslvl" $dtb -o unsigned-new.img;;
+  AOSP) bin/mkbootimg --kernel "$kernel" --ramdisk "$ramdisk" $second --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --os_version "$osver" --os_patch_level "$oslvl" $hash $dtb -o $outname;;
 esac;
 if [ $? != "0" ]; then
   abort;
   return 1;
 fi;
 
-if [ "$imgtype" == "CHROMEOS" ]; then
+if [ -f split_img/*-sigtype ]; then
+  sigtype=`cat split_img/*-sigtype`;
+  if [ -f split_img/*-blobtype ]; then
+    blobtype=" $(cat split_img/*-blobtype)";
+  fi;
   echo "Signing new image...\n";
-  bin/futility vbutil_kernel --pack image-new.img --keyblock bin/chromeos/kernel.keyblock --signprivate bin/chromeos/kernel_data_key.vbprivk --version 1 --vmlinuz unsigned-new.img --bootloader bin/chromeos/empty --config bin/chromeos/empty --arch arm --flags 0x1;
+  echo "Using signature: $sigtype$blobtype\n";
+  case $sigtype in
+    CHROMEOS) bin/futility vbutil_kernel --pack image-new.img --keyblock bin/chromeos/kernel.keyblock --signprivate bin/chromeos/kernel_data_key.vbprivk --version 1 --vmlinuz unsigned-new.img --bootloader bin/chromeos/empty --config bin/chromeos/empty --arch arm --flags 0x1;;
+    BLOB)
+      $bb printf '-SIGNED-BY-SIGNBLOB-\00\00\00\00\00\00\00\00' > image-new.img;
+      bin/blobpack tempblob $blobtype unsigned-new.img >/dev/null;
+      cat tempblob >> image-new.img;
+      rm -rf tempblob;
+    ;;
+  esac;
   if [ $? != "0" ]; then
     abort;
     exit 1;
