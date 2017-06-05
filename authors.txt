@@ -1,4 +1,4 @@
-unpackbootimg, mkbootimg:
+mkbootimg, unpackbootimg:
 https://github.com/CyanogenMod/android_system_core/tree/cm-10.2/mkbootimg (initial sources)
 https://github.com/huaixzk/unpackbootimg (makefiles)
 https://github.com/osm0sis/mkbootimg (patches)
@@ -8,9 +8,16 @@ https://github.com/CyanogenMod/android_system_core/tree/cm-11.0/cpio (initial so
 https://github.com/trevd/android_system_core_cpio (makefile)
 https://github.com/osm0sis/mkbootfs (patches)
 
+pxa1088-mkbootimg, pxa1088-unpackbootimg:
+https://github.com/AKuHAK/pxa1088-mkbootimg (initial source)
+https://github.com/osm0sis/pxa1088-mkbootimg (patches)
+
 unpackelf:
 https://github.com/tobiaswaldvogel/and_boot_tools/tree/master/bootimg (initial source)
 https://github.com/osm0sis/unpackelf (patches)
+
+dumpimage, mkimage:
+http://www.denx.de/wiki/U-Boot/WebHome
 
 mkmtkhdr:
 https://github.com/omnirom/android_device_oppo_r819/tree/android-4.4/mkmtkbootimg (initial source)
@@ -23,11 +30,17 @@ futility:
 https://github.com/jcadduono/platform_external_vboot_reference (initial source)
 https://github.com/osm0sis/futility (patches)
 
+BootSignature.jar (requires JRE 8):
+https://forum.xda-developers.com/android/software-hacking/signing-boot-images-android-verified-t3600606
+
 blobpack, blobunpack:
 https://github.com/AndroidRoot/BlobTools
 
+kernel_dump:
+https://forum.xda-developers.com/crossdevice-dev/sony/tool-unpack-format-sony-kernel-image-t3530077
+
 bzip2, chmod, cpio, cut, dd, file, gzip, lzop, printf, tail, xz;
-cygbz2-1, cygcrypto-1.0.0, cyggcc_s-1, cygiconv-2, cygintl-8, cyglzma-5, cyglzo2-2, cygmagic-1, cygwin1, cygz:
+cygbz2-1, cygcrypto-1.0.0, cyggcc_s-1, cygiconv-2, cygintl-8, cyglzma-5, cyglzo2-2, cygmagic-1, cygssl-1.0.0, cygwin1, cygz:
 http://cygwin.com/
 
 lz4:

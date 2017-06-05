@@ -9,17 +9,24 @@
 # Google ChromeOS Signature
 0		string		CHROMEOS			CHROMEOS signing
 
+# Sony SIN Packaging/Signature
+0		string		\x01\x00\x00\x00	SIN signing v1
+0		string		\x02\x00\x00\x00	SIN signing v2
+0		string		\x03SIN				SIN signing v3
+
 # Google Pixel/Nexus/AOSP Standard
 # [test "x" as workaround to odd file/magic behavior not allowing search here]
 0		string		x
 >0		search		ANDROID!			AOSP bootimg
+>36		string		\x00\x00\x00\x02	\b, PXA variant (02)
+>36		string		\x00\x00\x00\x03	\b, PXA variant (03)
 >1024	search		LOKI\x01			\b, LOKI header (recovery)
 >1024	search		LOKI\x00			\b, LOKI header (boot)
 >2048	search		\x88\x16\x88\x58	\b, MTK headers
 !:strength * 2
 
 # Sony ELF
-0		string		\x7fELF				ELF
+0		string		\x7FELF				ELF
 >5		string		\x01\x01\x61		bootimg
 >18		string		\x28				(ARM
 >18		string		\x03				(x86_
@@ -45,6 +52,13 @@
 # Qualcomm Device Tree
 # [for detection after boot image has already been split]
 0		string		QCDT				QCDT header
+!:strength / 15
+
+# Google Android Verified Boot Signature
+# [for detection with the tail of the boot image]
+0		search		\x02\x01\x01\x30\x82	AVB signature footer
+>0		search		/boot					\b, boot type
+>0		search		/recovery				\b, recovery type
 !:strength / 15
 
 # Samsung SEAndroid
