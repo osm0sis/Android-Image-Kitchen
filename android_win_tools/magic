@@ -1,7 +1,7 @@
 #------------------------------------------------------------------------------
 # Slimmed down magic file for archives only
 #------------------------------------------------------------------------------
-# $File: archive,v 1.103 2016/05/05 17:07:40 christos Exp $
+# $File: archive,v 1.107 2017/03/20 19:51:15 christos Exp $
 # archive:  file(1) magic for archive formats (see also "msdos" for self-
 #           extracting compressed archives)
 #
@@ -251,9 +251,9 @@
 # URL: http://fileformats.archiveteam.org/wiki/TTComp_archive
 # Update: Joerg Jenderek
 # GRR: line below is too general as it matches also Panorama database "TCDB 2003-10 demo.pan", others
-0	string	\0\6 
+0	string	\0\6
 # look for first keyword of Panorama database *.pan
->12	search/261	DESIGN	
+>12	search/261	DESIGN
 # skip keyword with low entropy
 >12	default		x	TTComp archive, binary, 4K dictionary
 # (version 5.25) labeled the above entry as "TTComp archive data"
@@ -449,9 +449,9 @@
 0	string	SZ\x0a\4 SZip archive data
 # XPack DiskImage
 # *.XDI updated by Joerg Jenderek Sep 2015
-# ftp://ftp.sac.sk/pub/sac/pack/0index.txt 
+# ftp://ftp.sac.sk/pub/sac/pack/0index.txt
 # GRR: this test is still too general as it catches also text files starting with jm
-0	string	jm	
+0	string	jm
 # only found examples with this additional characteristic 2 bytes
 >2	string	\x2\x4	Xpack DiskImage archive data
 #!:ext xdi
@@ -464,7 +464,7 @@
 # ftp://ftp.elf.stuba.sk/pub/pc/pack/xpa32.zip
 # created by XPA32.EXE version 1.0.2 for Windows
 >0	string	xpa\0\1 \b32 archive data
-# created by XPACK.COM version 1.67m or 1.67r with short 0x1800 
+# created by XPACK.COM version 1.67m or 1.67r with short 0x1800
 >3	ubeshort	!0x0001	\bck archive data
 # XPack Single Data
 # changed by Joerg Jenderek Sep 2015 back to like in version 5.12
@@ -935,12 +935,12 @@
 >3		ubyte			0		\b, no compression
 >3		ubyte			2		\b, fast compression (Z1)
 >3		ubyte			3		\b, medium compression (Z2)
->3		ubyte			>3		
+>3		ubyte			>3
 >>3		ubyte			<11		\b, compression (Z%d-1)
->2		ubyte&0x08		0x00		
+>2		ubyte&0x08		0x00
 # ~ 30 byte password field only for *.gho
 >>12		ubequad			!0		\b, password protected
->>44		ubyte			!1		
+>>44		ubyte			!1
 # 1~Image All, sector-by-sector only for *.gho
 >>>10		ubyte			1		\b, sector copy
 # 1~Image Boot track only for *.gho
@@ -950,8 +950,8 @@
 # optional image description only *.gho
 >>0xff		string			>\0		"%-.254s"
 # look for DOS sector end sequence
->0xE08	search/7776		\x55\xAA	
->>&-512	indirect		x		\b; contains 
+>0xE08	search/7776		\x55\xAA
+>>&-512	indirect		x		\b; contains
 
 # Google Chrome extensions
 # https://developer.chrome.com/extensions/crx
@@ -960,8 +960,15 @@
 !:mime	application/x-chrome-extension
 >4	ulong	x	\b, version %u
 
+# SeqBox - Sequenced container
+# ext: sbx, seqbox
+# Marco Pontello marcopon@gmail.com
+# reference: https://github.com/MarcoPon/SeqBox
+0	string	SBx	SeqBox,
+>3	byte	x	version %d
+
 #------------------------------------------------------------------------------
-# $File: compress,v 1.65 2015/12/04 20:48:03 christos Exp $
+# $File: compress,v 1.67 2017/03/17 21:35:28 christos Exp $
 # compress:  file(1) magic for pure-compression formats (no archives)
 #
 # compress, gzip, pack, compact, huf, squeeze, crunch, freeze, yabba, etc.
@@ -1232,12 +1239,12 @@
 
 # Zlib https://www.ietf.org/rfc/rfc6713.txt
 0	string/b	x
->0	beshort%31	=0	
+>0	beshort%31	=0
 >>0	byte&0xf	=8
 >>>0	byte&0x80 	=0	zlib compressed data
 
 #------------------------------------------------------------
-# $File: android,v 1.8 2015/03/19 18:04:37 christos Exp $
+# $File: android,v 1.10 2017/03/17 21:35:28 christos Exp $
 # Various android related magic entries
 #------------------------------------------------------------
 
