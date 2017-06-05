@@ -81,8 +81,8 @@ ui_print "Using architecture: $arch";
 cp -rf data/* /data;
 cp -rf bin/$arch/* /data/local/AIK-mobile/bin/;
 set_perm_recursive 0 0 0755 0755 "/data/local/AIK-mobile";
-set_perm_recursive 0 0 0755 0644 "/data/local/AIK-mobile/bin/chromeos/*";
-set_perm 0 0 0644 "/data/local/AIK-mobile/authors.txt" "/data/local/AIK-mobile/bin/androidbootimg.magic" "/data/local/AIK-mobile/bin/magic";
+set_perm_recursive 0 0 0755 0644 "/data/local/AIK-mobile/bin/avb" "/data/local/AIK-mobile/bin/chromeos";
+set_perm 0 0 0644 "/data/local/AIK-mobile/authors.txt" "/data/local/AIK-mobile/bin/androidbootimg.magic" "/data/local/AIK-mobile/bin/BootSignature_Android.jar" "/data/local/AIK-mobile/bin/magic";
 set_progress 0.8;
 
 ui_print " ";
