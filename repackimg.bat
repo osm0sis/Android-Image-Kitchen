@@ -37,7 +37,7 @@ if not "[%~1]" == "[]" (
     )
   )
   if "%~1" == "--avbkey" (
-    if not "[%~2]" == "[]" if exist "%~2.pk8" if exist "%~2.x509.der" (
+    if not "[%~2]" == "[]" if exist "%~2.pk8" if exist "%~2.x509."* (
       set "avbkey=%~2"
       set "avbtxt= - Key: %~2"
       shift
@@ -69,8 +69,14 @@ echo.
 
 echo Getting build information . . .
 echo.
+
+for /f "delims=" %%a in ('dir /b split_img\*-imgtype') do @set "imgtypename=%%a"
+for /f "delims=" %%a in ('type "split_img\%imgtypename%"') do @set "imgtype=%%a"
+
+if "%imgtype%" == "KRNL" goto skipzimg
 for /f "delims=" %%a in ('dir /b split_img\*-zImage') do @set "kernelname=%%a"
 echo kernel = %kernelname% & set "kernel=split_img/%kernelname%"
+:skipzimg
 for /f "delims=" %%a in ('dir /b split_img\*-ramdisk.cpio*') do @set "ramdiskname=%%a"
 if defined original (
   echo ramdisk = %ramdiskname%
@@ -79,9 +85,9 @@ if defined original (
   set "ramdiskname=ramdisk-new.cpio.%compext%"
   set "ramdisk=ramdisk-new.cpio.%compext%"
 )
-
-for /f "delims=" %%a in ('dir /b split_img\*-imgtype') do @set "imgtypename=%%a"
-for /f "delims=" %%a in ('type "split_img\%imgtypename%"') do @set "imgtype=%%a"
+if "%imgtype%" == "KRNL" (
+  for %%i in (%ramdisk%) do @echo ramdisk_size = %%~z%i
+)
 
 if not "%imgtype%" == "U-Boot" goto skipuboot
 for /f "delims=" %%a in ('dir /b split_img\*-name') do @set "namename=%%a"
@@ -106,6 +112,7 @@ echo entry_point = %ep%
 goto skipaosp
 
 :skipuboot
+if "%imgtype%" == "KRNL" goto skipaosp
 if not exist "split_img\*-second" goto skipsecond
 for /f "delims=" %%a in ('dir /b split_img\*-second') do @set "second=%%a"
 echo second = %second% & set "second=--second "split_img/%second%""
@@ -177,7 +184,7 @@ for /f "delims=" %%a in ('type "split_img\%mtktypename%"') do @set "mtktype=%%a"
 echo Generating MTK headers . . .
 echo.
 echo Using ramdisk type: %mtktype%
-"%bin%"\mkmtkhdr --kernel "%kernel%" --%mtktype% %ramdisk% >nul
+"%bin%"\mkmtkhdr --kernel "%kernel%" --%mtktype% "%ramdisk%" >nul
 if errorlevel == 1 goto error
 move /y "%kernelname%-mtk" kernel-new.mtk >nul
 move /y "%ramdiskname%-mtk" %mtktype%-new.mtk >nul
@@ -193,7 +200,8 @@ if exist "split_img\*-sigtype" (
 )
 if "%imgtype%" == "ELF" set "imgtype=AOSP" & echo Warning: ELF format detected; will be repacked using AOSP format! & echo.
 if "%imgtype%" == "AOSP" set "buildcmd=mkbootimg --kernel "%kernel%" --ramdisk "%ramdisk%" %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% --second_offset "%secondoff%" --tags_offset "%tagsoff%" --os_version "%osver%" --os_patch_level "%oslvl%" %hash% %dtb% -o %outname%"
-if "%imgtype%" == "AOSP-PXA" set "buildcmd=pxa1088-mkbootimg --kernel "%kernel%" --ramdisk "%ramdisk%" %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% --second_offset "%secondoff%" --tags_offset "%tagsoff%" --unknown "%unknown%" %dtb% -o %outname%"
+if "%imgtype%" == "AOSP-PXA" set "buildcmd=pxa-mkbootimg --kernel "%kernel%" --ramdisk "%ramdisk%" %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% --second_offset "%secondoff%" --tags_offset "%tagsoff%" --unknown "%unknown%" %dtb% -o %outname%"
+if "%imgtype%" == "KRNL" set "buildcmd=rkcrc -k "%ramdisk%" %outname%"
 if "%imgtype%" == "U-Boot" set "buildcmd=mkimage -A %arch% -O %os% -T %type% -C %comp% -a %addr% -e %ep% -n "%name%" -d "%kernel%":"%ramdisk%" %outname% >nul"
 
 echo Building image . . .
@@ -219,15 +227,17 @@ echo Signing new image . . .
 echo.
 echo Using signature: %sigtype% %avbtype%%avbtxt%%blobtype%
 echo.
-if not defined avbkey set "avbkey=%rel%/avb/testkey"
-if "%sigtype%" == "CHROMEOS" "%bin%"\futility vbutil_kernel --pack image-new.img --keyblock %rel%/chromeos/kernel.keyblock --signprivate %rel%/chromeos/kernel_data_key.vbprivk --version 1 --vmlinuz unsigned-new.img --bootloader %rel%/chromeos/empty --config %rel%/chromeos/empty --arch arm --flags 0x1
-if "%sigtype%" == "AVB" java -jar "%bin%"\BootSignature.jar /%avbtype% unsigned-new.img "%avbkey%.pk8" "%avbkey%.x509.der" image-new.img 2>nul
+if not defined avbkey set "avbkey=%rel%/avb/verity"
+if "%sigtype%" == "AVB" java -jar "%bin%"\BootSignature.jar /%avbtype% unsigned-new.img "%avbkey%.pk8" "%avbkey%.x509."* image-new.img 2>nul
 if "%sigtype%" == "BLOB" (
   "%bin%"\printf '-SIGNED-BY-SIGNBLOB-\00\00\00\00\00\00\00\00' > image-new.img
   "%bin%"\blobpack tempblob %blobtype% unsigned-new.img >nul
   type tempblob >> image-new.img
   del /q tempblob >nul
 )
+if "%sigtype%" == "CHROMEOS" "%bin%"\futility vbutil_kernel --pack image-new.img --keyblock %rel%/chromeos/kernel.keyblock --signprivate %rel%/chromeos/kernel_data_key.vbprivk --version 1 --vmlinuz unsigned-new.img --bootloader %rel%/chromeos/empty --config %rel%/chromeos/empty --arch arm --flags 0x1
+if "%sigtype%" == "DHTB" "%bin%"\dhtbsign -i unsigned-new.img -o image-new.img >nul & del split_img\*-tailtype 2>nul
+if "%sigtype%" == "NOOK" type "split_img\*-master_boot.key" unsigned-new.img > image-new.img 2>nul
 if errorlevel == 1 goto error
 
 :skipsign
@@ -255,8 +265,8 @@ echo Appending footer . . .
 echo.
 echo Using type: %tailtype%
 echo.
-if "%tailtype%" == "SEAndroid" "%bin%"\printf 'SEANDROIDENFORCE' >> image-new.img
 if "%tailtype%" == "Bump" "%bin%"\printf '\x41\xA9\xE4\x67\x74\x4D\x1D\x1B\xA4\x29\xF2\xEC\xEA\x65\x52\x79' >> image-new.img
+if "%tailtype%" == "SEAndroid" "%bin%"\printf 'SEANDROIDENFORCE' >> image-new.img
 
 :skiptail
 echo Done!
