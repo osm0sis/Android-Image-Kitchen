@@ -1,7 +1,7 @@
 #------------------------------------------------------------------------------
 # Slimmed down magic file for archives only
 #------------------------------------------------------------------------------
-# $File: archive,v 1.107 2017/03/20 19:51:15 christos Exp $
+# $File: archive,v 1.108 2017/08/30 13:45:10 christos Exp $
 # archive:  file(1) magic for archive formats (see also "msdos" for self-
 #           extracting compressed archives)
 #
@@ -968,7 +968,7 @@
 >3	byte	x	version %d
 
 #------------------------------------------------------------------------------
-# $File: compress,v 1.67 2017/03/17 21:35:28 christos Exp $
+# $File: compress,v 1.68 2017/05/25 20:07:23 christos Exp $
 # compress:  file(1) magic for pure-compression formats (no archives)
 #
 # compress, gzip, pack, compact, huf, squeeze, crunch, freeze, yabba, etc.
@@ -1192,7 +1192,7 @@
 # Zstandard/LZ4 skippable frames
 # https://github.com/facebook/zstd/blob/dev/zstd_compression_format.md
 0         lelong&0xFFFFFFF0  0x184D2A50
->(4.l+8)  indirect
+>(4.l+8)  indirect	x
 
 # https://github.com/facebook/zstd/blob/dev/zstd_compression_format.md
 0  lelong    0xEC30A437  Zstandard dictionary

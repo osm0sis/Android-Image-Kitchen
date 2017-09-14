@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # AIK-Linux/unpackimg: split image and unpack ramdisk
 # osm0sis @ xda-developers
 
@@ -16,19 +16,20 @@ bin="$aik/bin";
 rel=bin;
 
 cd "$aik";
-chmod -R 755 $bin *.sh;
-chmod 644 $bin/magic $bin/androidbootimg.magic $bin/BootSignature.jar $bin/avb/* $bin/chromeos/*;
+chmod -R 755 "$bin" *.sh;
+chmod 644 "$bin/magic" "$bin/androidbootimg.magic" "$bin/BootSignature.jar" "$bin/avb/"* "$bin/chromeos/"*;
 
 arch=`uname -m`;
 
 img="$1";
 if [ ! "$img" ]; then
-  for i in `ls *.elf *.img *.sin 2>/dev/null`; do
-    case $i in
+  while IFS= read -r line; do
+    case $line in
       aboot.img|image-new.img|unlokied-new.img|unsigned-new.img) continue;;
     esac;
-    img="$i"; break;
-  done;
+    img="$line";
+    break;
+  done < <(ls *.elf *.img *.sin 2>/dev/null);
 fi;
 img="$(readlink -f "$img")";
 if [ ! -f "$img" ]; then
@@ -63,22 +64,27 @@ mkdir split_img ramdisk;
 imgtest="$(file -m $rel/androidbootimg.magic "$img" | cut -d: -f2-)";
 if [ "$(echo $imgtest | awk '{ print $2 }' | cut -d, -f1)" = "signing" ]; then
   echo $imgtest | awk '{ print $1 }' > "split_img/$file-sigtype";
-  sigtype=`cat split_img/$file-sigtype`;
+  sigtype=$(cat "split_img/$file-sigtype");
   echo "Signature with \"$sigtype\" type detected, removing...";
   echo " ";
   case $sigtype in
-    CHROMEOS) $bin/$arch/futility vbutil_kernel --get-vmlinuz "$img" --vmlinuz-out split_img/$file;;
     BLOB)
       cd split_img;
-      cp -f "$img" $file;
-      $bin/$arch/blobunpack $file | tail -n+5 | cut -d" " -f2 | dd bs=1 count=3 > $file-blobtype 2>/dev/null;
-      mv -f $file.* $file;
+      cp -f "$img" "$file";
+      "$bin/$arch/blobunpack" "$file" | tail -n+5 | cut -d" " -f2 | dd bs=1 count=3 > "$file-blobtype" 2>/dev/null;
+      mv -f "$file."* "$file";
       cd ..;
     ;;
+    CHROMEOS) "$bin/$arch/futility" vbutil_kernel --get-vmlinuz "$img" --vmlinuz-out "split_img/$file";;
+    DHTB) dd bs=4096 skip=512 iflag=skip_bytes conv=notrunc if="$img" of="split_img/$file" 2>/dev/null;;
+    NOOK)
+      dd bs=1048576 count=1 conv=notrunc if="$img" of="split_img/$file-master_boot.key" 2>/dev/null;
+      dd bs=1048576 skip=1 conv=notrunc if="$img" of="split_img/$file" 2>/dev/null;
+    ;;
     SIN)
-      $bin/$arch/kernel_dump split_img "$img" >/dev/null;
-      mv -f split_img/$file.* split_img/$file;
-      rm -rf split_img/$file-sigtype;
+      "$bin/$arch/kernel_dump" split_img "$img" >/dev/null;
+      mv -f "split_img/$file."* "split_img/$file";
+      rm -rf "split_img/$file-sigtype";
     ;;
   esac;
   img="$aik/split_img/$file";
@@ -88,7 +94,7 @@ imgtest="$(file -m $rel/androidbootimg.magic "$img" | cut -d: -f2-)";
 if [ "$(echo $imgtest | awk '{ print $2 }' | cut -d, -f1)" = "bootimg" ]; then
   test "$(echo $imgtest | awk '{ print $3 }')" = "PXA" && typesuffix=-PXA;
   echo "$(echo $imgtest | awk '{ print $1 }')$typesuffix" > "split_img/$file-imgtype";
-  imgtype=`cat split_img/$file-imgtype`;
+  imgtype=$(cat "split_img/$file-imgtype");
 else
   cleanup;
   echo "Unrecognized format.";
@@ -99,7 +105,7 @@ echo "Image type: $imgtype";
 echo " ";
 
 case $imgtype in
-  AOSP*|ELF|U-Boot) ;;
+  AOSP*|ELF|KRNL|U-Boot) ;;
   *)
     cleanup;
     echo "Unsupported format.";
@@ -110,12 +116,12 @@ esac;
 
 if [ "$(echo $imgtest | awk '{ print $3 }')" = "LOKI" ]; then
   echo $imgtest | awk '{ print $5 }' | cut -d\( -f2 | cut -d\) -f1 > "split_img/$file-lokitype";
-  lokitype=`cat split_img/$file-lokitype`;
+  lokitype=$(cat "split_img/$file-lokitype");
   echo "Loki patch with \"$lokitype\" type detected, reverting...";
   echo " ";
   echo "Warning: A dump of your device's aboot.img is required to re-Loki!";
   echo " ";
-  $bin/$arch/loki_tool unlok "$img" "split_img/$file" >/dev/null;
+  "$bin/$arch/loki_tool" unlok "$img" "split_img/$file" >/dev/null;
   img="$file";
 fi;
 
@@ -126,9 +132,9 @@ case $tailtype in
     echo "Signature with \"$tailtype\" type detected.";
     echo " ";
     echo $tailtype > "split_img/$file-sigtype";
-    echo $tailtest | awk '{ print $4 }' > "split_img/$file-avbtype";
+    echo $tailtest | awk '{ print $5 }' > "split_img/$file-avbtype";
   ;;
-  SEAndroid|Bump)
+  Bump|SEAndroid)
     echo "Footer with \"$tailtype\" type detected.";
     echo " ";
     echo $tailtype > "split_img/$file-tailtype";
@@ -138,12 +144,13 @@ esac;
 echo 'Splitting image to "split_img/"...';
 cd split_img;
 case $imgtype in
-  AOSP) $bin/$arch/unpackbootimg -i "$img";;
-  AOSP-PXA) $bin/$arch/pxa1088-unpackbootimg -i "$img";;
-  ELF) $bin/$arch/unpackelf -i "$img";;
+  AOSP) "$bin/$arch/unpackbootimg" -i "$img";;
+  AOSP-PXA) "$bin/$arch/pxa-unpackbootimg" -i "$img";;
+  ELF) "$bin/$arch/unpackelf" -i "$img";;
+  KRNL) dd bs=4096 skip=8 iflag=skip_bytes conv=notrunc if="$img" of="$file-ramdisk.cpio.gz" 2>&1 | tail -n+3 | cut -d" " -f1-2;;
   U-Boot)
-    $bin/$arch/dumpimage -l "$img";
-    $bin/$arch/dumpimage -l "$img" > "$file-header";
+    "$bin/$arch/dumpimage" -l "$img";
+    "$bin/$arch/dumpimage" -l "$img" > "$file-header";
     grep "Name:" "$file-header" | cut -c15- > "$file-name";
     grep "Type:" "$file-header" | cut -c15- | cut -d" " -f1 > "$file-arch";
     grep "Type:" "$file-header" | cut -c15- | cut -d" " -f2 > "$file-os";
@@ -152,26 +159,32 @@ case $imgtype in
     grep "Address:" "$file-header" | cut -c15- > "$file-addr";
     grep "Point:" "$file-header" | cut -c15- > "$file-ep";
     rm -rf "$file-header";
-    $bin/$arch/dumpimage -i "$img" -p 0 "$file-zImage";
+    "$bin/$arch/dumpimage" -i "$img" -p 0 "$file-zImage";
     if [ ! $? -eq "0" ]; then
       cleanup;
       abort;
       exit 1;
     fi;
-    if [ ! "$(cat $file-type)" = "Multi" ]; then
+    if [ ! "$(cat "$file-type")" = "Multi" ]; then
       echo " ";
       echo "No ramdisk found.";
       cleanup;
       abort;
       exit 1;
     fi;
-    $bin/$arch/dumpimage -i "$img" -p 1 "$file-ramdisk.cpio.gz";
+    "$bin/$arch/dumpimage" -i "$img" -p 1 "$file-ramdisk.cpio.gz";
   ;;
 esac;
 if [ ! $? -eq "0" ]; then
   cleanup;
   abort;
   exit 1;
+fi;
+
+if [ "$imgtype" = "AOSP" ] && [ "$(cat "$file-hash")" = "unknown" ]; then
+  echo " ";
+  echo 'Warning: "unknown" hash type detected; assuming "sha1" type!';
+  echo "sha1" > "$file-hash";
 fi;
 
 if [ "$(file -m ../$rel/androidbootimg.magic *-zImage | cut -d: -f2 | awk '{ print $1 }')" = "MTK" ]; then
@@ -222,7 +235,7 @@ ramdiskcomp=`cat *-ramdiskcomp`;
 unpackcmd="$ramdiskcomp -dc";
 compext=$ramdiskcomp;
 case $ramdiskcomp in
-  gzip) compext=gz;;
+  gzip) unpackcmd="gzip -dcq"; compext=gz;;
   lzop) compext=lzo;;
   xz) ;;
   lzma) ;;
@@ -251,7 +264,7 @@ if [ ! "$compext" ]; then
   abort;
   exit 1;
 fi;
-$unpackcmd "../split_img/$file-ramdisk.cpio$compext" | $sudo cpio -i;
+$unpackcmd "../split_img/$file-ramdisk.cpio$compext" | $sudo cpio -i -d --no-absolute-filenames;
 if [ ! $? -eq "0" ]; then
   echo "Unpacking failed, try ./unpackimg.sh --sudo";
   abort;

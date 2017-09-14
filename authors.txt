@@ -8,9 +8,9 @@ https://github.com/CyanogenMod/android_system_core/tree/cm-11.0/cpio (initial so
 https://github.com/trevd/android_system_core_cpio (makefile)
 https://github.com/osm0sis/mkbootfs (patches)
 
-pxa1088-mkbootimg, pxa1088-unpackbootimg:
-https://github.com/AKuHAK/pxa1088-mkbootimg (initial source)
-https://github.com/osm0sis/pxa1088-mkbootimg (patches)
+pxa-mkbootimg, pxa-unpackbootimg:
+https://github.com/AKuHAK/pxa-mkbootimg (initial source)
+https://github.com/osm0sis/pxa-mkbootimg (patches)
 
 unpackelf:
 https://github.com/tobiaswaldvogel/and_boot_tools/tree/master/bootimg (initial source)
@@ -36,6 +36,13 @@ https://forum.xda-developers.com/android/software-hacking/signing-boot-images-an
 blobpack, blobunpack:
 https://github.com/AndroidRoot/BlobTools
 
+dhtbsign:
+https://github.com/chiefwigms/degas-mkbootimg/tree/galaxy_tab_a_smt285 (initial source)
+https://github.com/osm0sis/dhtbsign (patches)
+
+rkcrc:
+https://github.com/rockchip-linux/rkflashtool
+
 kernel_dump:
 https://forum.xda-developers.com/crossdevice-dev/sony/tool-unpack-format-sony-kernel-image-t3530077
 
@@ -45,7 +52,7 @@ http://lz4.github.io/lz4/
 magic:
 http://www.darwinsys.com/file/
 
-gzip, bzip2, lzop, xz; awk, basename, cpio, cut, dd, dirname, file, find, grep, printf, sudo, tail:
+gzip, bzip2, lzop, xz; awk, basename, bash, cpio, cut, dd, dirname, file, find, grep, printf, sudo, tail, wc:
 (required system packages/commands)
 
 androidbootimg.magic:
