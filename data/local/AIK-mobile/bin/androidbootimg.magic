@@ -6,8 +6,15 @@
 # ASUS Blob Signature
 0		string		-SIGNED-BY-SIGNBLOB-	BLOB signing
 
+# Barnes & Noble Nook Signature
+64		string		Green\x20Loader			NOOK signing (loader)
+64		string		Green\x20Recovery		NOOK signing (recovery)
+
 # Google ChromeOS Signature
 0		string		CHROMEOS			CHROMEOS signing
+
+# Samsung/Spreadtrum DHTB Signature
+0		string		DHTB\x01\x00\x00	DHTB signing
 
 # Sony SIN Packaging/Signature
 0		string		\x01\x00\x00\x00	SIN signing v1
@@ -18,12 +25,22 @@
 # [test "x" as workaround to odd file/magic behavior not allowing search here]
 0		string		x
 >0		search		ANDROID!			AOSP bootimg
->36		string		\x00\x00\x00\x02	\b, PXA variant (02)
->36		string		\x00\x00\x00\x03	\b, PXA variant (03)
->1024	search		LOKI\x01			\b, LOKI header (recovery)
->1024	search		LOKI\x00			\b, LOKI header (boot)
->2048	search		\x88\x16\x88\x58	\b, MTK headers
+>>36	string		\x00\x00\x00\x02	\b, PXA variant (020)
+>>36	string		\x00\x00\x80\x02	\b, PXA variant (028)
+>>36	string		\x00\x00\x00\x03	\b, PXA variant (030)
+>>1024	search		LOKI\x01			\b, LOKI header (recovery)
+>>1024	search		LOKI\x00			\b, LOKI header (boot)
+>>2048	search		\x88\x16\x88\x58	\b, MTK headers
 !:strength * 2
+
+# DENX U-Boot
+0		string		\x27\x05\x19\x56	U-Boot bootimg
+
+# Intel OS
+0		string		$OS$\x00\x00\x01	OS bootimg
+
+# Rockchip KRNL
+0		string		KRNL				KRNL bootimg
 
 # Sony ELF
 0		string		\x7FELF				ELF
@@ -34,12 +51,6 @@
 >4		string		\x01				\b)
 >4		string		\x02				\b64)
 >0		search		\x88\x16\x88\x58	\b, MTK headers
-
-# Intel OS
-0		string		$OS$\x00\x00\x01	OS bootimg
-
-# DENX U-Boot
-0		string		\x27\x05\x19\x56	U-Boot bootimg
 
 # MediaTek MTK
 # [for detection after boot image has already been split]
@@ -56,9 +67,14 @@
 
 # Google Android Verified Boot Signature
 # [for detection with the tail of the boot image]
-0		search		\x02\x01\x01\x30\x82	AVB signature footer
+0		search		\x02\x01\x01\x30\x82	AVB signing v1 footer
 >0		search		/boot					\b, boot type
 >0		search		/recovery				\b, recovery type
+!:strength / 15
+
+# LG Bump
+# [for detection with the tail of the boot image]
+0		search		\x41\xA9\xE4\x67\x74\x4D\x1D\x1B\xA4\x29\xF2\xEC\xEA\x65\x52\x79	Bump footer
 !:strength / 15
 
 # Samsung SEAndroid
@@ -66,9 +82,4 @@
 # [test "x" as workaround to odd file/magic behavior not allowing search here]
 0		string		x
 >0		search		SEANDROIDENFORCE	SEAndroid footer
-!:strength / 15
-
-# LG Bump
-# [for detection with the tail of the boot image]
-0		search		\x41\xA9\xE4\x67\x74\x4D\x1D\x1B\xA4\x29\xF2\xEC\xEA\x65\x52\x79	Bump footer
 !:strength / 15

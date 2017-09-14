@@ -19,7 +19,7 @@ abort() { cd "$aik"; echo "Error!"; }
 cd "$aik";
 bb=$bin/busybox;
 chmod -R 755 $bin *.sh;
-chmod 644 $bin/magic $bin/androidbootimg.magic $bin/BootSignature_Android.jar $bin/avb/* $bin/chromeos/*;
+chmod 644 $bin/magic $bin/androidbootimg.magic $bin/BootSignature_Android.jar $bin/module.prop $bin/avb/* $bin/chromeos/*;
 
 if [ ! -f $bb ]; then
   bb=busybox;
@@ -52,7 +52,7 @@ while [ "$1" ]; do
     --avbkey)
       if [ "$2" ]; then
         for keytest in "$2" "$aik/$2"; do
-          if [ -f "$keytest.pk8" -a -f "$keytest.x509.der" ]; then
+          if [ -f "$keytest.pk8" -a -f "$keytest.x509.*" ]; then
             avbkey="$keytest"; avbtxt=" - Key: $2"; shift; break;
           fi;
         done;
@@ -88,15 +88,17 @@ fi;
 
 echo "\nGetting build information...";
 cd split_img;
-kernel=`ls *-zImage`;                 echo "kernel = $kernel";
-kernel="split_img/$kernel";
+imgtype=`cat *-imgtype`;
+if [ "$imgtype" != "KRNL" ]; then
+  kernel=`ls *-zImage`;               echo "kernel = $kernel";
+  kernel="split_img/$kernel";
+fi;
 if [ "$original" ]; then
   ramdisk=`ls *-ramdisk.cpio*`;       echo "ramdisk = $ramdisk";
   ramdisk="split_img/$ramdisk";
 else
   ramdisk="ramdisk-new.cpio.$compext";
 fi;
-imgtype=`cat *-imgtype`;
 if [ "$imgtype" == "U-Boot" ]; then
   name=`cat *-name`;                  echo "name = $name";
   arch=`cat *-arch`;
@@ -106,10 +108,12 @@ if [ "$imgtype" == "U-Boot" ]; then
   test "$comp" == "uncompressed" && comp=none;
   addr=`cat *-addr`;                  echo "load_addr = $addr";
   ep=`cat *-ep`;                      echo "entry_point = $ep";
+elif [ "$imgtype" == "KRNL" ]; then
+  rsz=$($bb wc -c < "$aik/$ramdisk"); echo "ramdisk_size = $rsz";
 else
   if [ -f *-second ]; then
     second=`ls *-second`;             echo "second = $second";
-    second="--second split_img/$second";
+    second=(--second "split_img/$second");
   fi;
   if [ -f *-cmdline ]; then
     cmdline=`cat *-cmdline`;          echo "cmdline = $cmdline";
@@ -139,7 +143,7 @@ else
   fi;
   if [ -f *-dtb ]; then
     dtb=`ls *-dtb`;                   echo "dtb = $dtb";
-    dtb="--dt split_img/$dtb";
+    dtb=(--dt "split_img/$dtb");
   fi;
   if [ -f *-unknown ]; then
     unknown=`cat *-unknown`;          echo "unknown = $unknown";
@@ -156,8 +160,8 @@ if [ -f split_img/*-mtktype ]; then
     abort;
     return 1;
   fi;
-  mv -f $($bb basename $kernel)-mtk kernel-new.mtk;
-  mv -f $($bb basename $ramdisk)-mtk $mtktype-new.mtk;
+  $bb mv -f "$($bb basename "$kernel")-mtk" kernel-new.mtk;
+  $bb mv -f "$($bb basename "$ramdisk")-mtk" $mtktype-new.mtk;
   kernel=kernel-new.mtk;
   ramdisk=$mtktype-new.mtk;
 fi;
@@ -176,9 +180,10 @@ fi;
 echo "\nBuilding image...\n";
 echo "Using format: $imgtype\n";
 case $imgtype in
-  AOSP) $bin/mkbootimg --kernel "$kernel" --ramdisk "$ramdisk" $second --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --os_version "$osver" --os_patch_level "$oslvl" $hash $dtb -o $outname;;
-  AOSP-PXA) $bin/pxa1088-mkbootimg --kernel "$kernel" --ramdisk "$ramdisk" $second --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --unknown $unknown $dtb -o $outname;;
+  AOSP) $bin/mkbootimg --kernel "$kernel" --ramdisk "$ramdisk" "${second[@]}" --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --os_version "$osver" --os_patch_level "$oslvl" $hash "${dtb[@]}" -o $outname;;
+  AOSP-PXA) $bin/pxa-mkbootimg --kernel "$kernel" --ramdisk "$ramdisk" "${second[@]}" --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --unknown $unknown "${dtb[@]}" -o $outname;;
   U-Boot) $bin/mkimage -A $arch -O $os -T $type -C $comp -a $addr -e $ep -n "$name" -d "$kernel":"$ramdisk" $outname >/dev/null;;
+  KRNL) $bin/rkcrc -k "$ramdisk" $outname;;
   *) echo "\nUnsupported format."; abort; exit 1;;
 esac;
 if [ $? != "0" ]; then
@@ -196,16 +201,21 @@ if [ -f split_img/*-sigtype ]; then
   fi;
   echo "Signing new image...\n";
   echo "Using signature: $sigtype $avbtype$avbtxt$blobtype\n";
-  test ! "$avbkey" && avbkey="$rel/avb/testkey";
+  test ! "$avbkey" && avbkey="$rel/avb/verity";
   case $sigtype in
-    CHROMEOS) $bin/futility vbutil_kernel --pack image-new.img --keyblock $rel/chromeos/kernel.keyblock --signprivate $rel/chromeos/kernel_data_key.vbprivk --version 1 --vmlinuz unsigned-new.img --bootloader $rel/chromeos/empty --config $rel/chromeos/empty --arch arm --flags 0x1;;
-    AVB) dalvikvm -Xbootclasspath:/system/framework/core-oj.jar:/system/framework/core-libart.jar:/system/framework/conscrypt.jar:/system/framework/bouncycastle.jar -Xnodex2oat -Xnoimage-dex2oat -cp $bin/BootSignature_Android.jar com.android.verity.BootSignature /$avbtype unsigned-new.img "$avbkey.pk8" "$avbkey.x509.der" image-new.img 2>/dev/null;;
+    AVB) dalvikvm -Xbootclasspath:/system/framework/core-oj.jar:/system/framework/core-libart.jar:/system/framework/conscrypt.jar:/system/framework/bouncycastle.jar -Xnodex2oat -Xnoimage-dex2oat -cp $bin/BootSignature_Android.jar com.android.verity.BootSignature /$avbtype unsigned-new.img "$avbkey.pk8" "$avbkey.x509."* image-new.img 2>/dev/null;;
     BLOB)
       $bb printf '-SIGNED-BY-SIGNBLOB-\00\00\00\00\00\00\00\00' > image-new.img;
       $bin/blobpack tempblob $blobtype unsigned-new.img >/dev/null;
       cat tempblob >> image-new.img;
       rm -rf tempblob;
     ;;
+    CHROMEOS) $bin/futility vbutil_kernel --pack image-new.img --keyblock $rel/chromeos/kernel.keyblock --signprivate $rel/chromeos/kernel_data_key.vbprivk --version 1 --vmlinuz unsigned-new.img --bootloader $rel/chromeos/empty --config $rel/chromeos/empty --arch arm --flags 0x1;;
+    DHTB)
+      $bin/dhtbsign -i unsigned-new.img -o image-new.img >/dev/null;
+      rm -rf split_img/*-tailtype 2>/dev/null;
+    ;;
+    NOOK) cat split_img/*-master_boot.key unsigned-new.img > image-new.img;;
   esac;
   if [ $? != "0" ]; then
     abort;
@@ -217,7 +227,7 @@ if [ -f split_img/*-lokitype ]; then
   lokitype=`cat split_img/*-lokitype`;
   echo "Loki patching new image...\n";
   echo "Using type: $lokitype\n";
-  mv -f image-new.img unlokied-new.img;
+  $bb mv -f image-new.img unlokied-new.img;
   if [ -f aboot.img ]; then
     $bin/loki_tool patch $lokitype aboot.img unlokied-new.img image-new.img >/dev/null;
     if [ $? != "0" ]; then
@@ -237,8 +247,8 @@ if [ -f split_img/*-tailtype ]; then
   echo "Appending footer...\n";
   echo "Using type: $tailtype\n";
   case $tailtype in
-    SEAndroid) $bb printf 'SEANDROIDENFORCE' >> image-new.img;;
     Bump) $bb printf '\x41\xA9\xE4\x67\x74\x4D\x1D\x1B\xA4\x29\xF2\xEC\xEA\x65\x52\x79' >> image-new.img;;
+    SEAndroid) $bb printf 'SEANDROIDENFORCE' >> image-new.img;;
   esac;
 fi;
 

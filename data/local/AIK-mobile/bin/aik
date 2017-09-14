@@ -3,34 +3,44 @@
 # osm0sis @ xda-developers
 
 aik=/data/local/AIK-mobile;
+bb=$aik/bin/busybox;
 
 case $1 in
   --restore)
     # fix shortcut script
-    if [ -e /su ]; then
-      su -c "cp -pf $aik/bin/aik /su/bin/aik";
-    elif [ -e /magisk ]; then
-      su -c "mkdir -p /magisk/aik-mobile/bin; \
-             cp -pf $aik/bin/aik /magisk/aik-mobile/bin/aik; \
-             touch /magisk/aik-mobile/auto_mount";
-    else
-      su -c "mount -o rw,remount -t auto /system; \
-             rm -f /system/xbin/aik; \
-             cp -pf $aik/bin/aik /system/xbin/aik; \
-             mount -o ro,remount -t auto /system";
-    fi;
-    echo "aik: shortcut restored!";
+    su -c " \
+      if [ -e /su ]; then \
+        cp -pf $aik/bin/aik /su/bin/aik; \
+      elif [ -e /sbin/supersu ]; then \
+        cp -pf $aik/bin/aik /sbin/supersu/bin/aik; \
+      elif [ -e /magisk ]; then \
+        mkdir -p /magisk/aik-mobile/system/bin; \
+        cp -pf $aik/bin/aik /magisk/aik-mobile/system/bin/aik; \
+        cp -pf $aik/bin/module.prop /magisk/aik-mobile/module.prop; \
+        touch /magisk/aik-mobile/auto_mount; \
+        chcon -hR 'u:object_r:system_file:s0' /magisk/aik-mobile; \
+        rbmsg=' (reboot required)'; \
+      else \
+        $bb mount -o rw,remount -t auto /system; \
+        rm -f /system/xbin/aik; \
+        cp -pf $aik/bin/aik /system/xbin/aik; \
+        $bb mount -o ro,remount -t auto /system; \
+      fi; \
+      echo "aik: shortcut restored!$rbmsg"; \
+    ";
   ;;
   --uninstall)
     # remove AIK-mobile and shortcut script
-    if [ -e /su -o -e /magisk ]; then
-      su -c "rm -rf $aik /su/bin/aik /magisk/aik-mobile";
-    else
-      su -c "mount -o rw,remount -t auto /system; \
-             rm -rf $aik /system/xbin/aik; \
-             mount -o ro,remount -t auto /system";
-    fi;
-    echo "aik: uninstall complete!";
+    su -c " \
+      if [ -e /su -o -e /sbin/supersu -o -e /magisk ]; then \
+        rm -rf $aik /su/bin/aik /sbin/supersu/bin/aik /magisk/aik-mobile; \
+      else \
+        $bb mount -o rw,remount -t auto /system; \
+        rm -rf $aik /system/xbin/aik; \
+        $bb mount -o ro,remount -t auto /system; \
+      fi; \
+      echo 'aik: uninstall complete!'; \
+    ";
   ;;
   --help)
     # print help for shortcut command
