@@ -3,11 +3,6 @@ https://github.com/CyanogenMod/android_system_core/tree/cm-10.2/mkbootimg (initi
 https://github.com/huaixzk/unpackbootimg (makefiles)
 https://github.com/osm0sis/mkbootimg (patches)
 
-mkbootfs:
-https://github.com/CyanogenMod/android_system_core/tree/cm-11.0/cpio (initial source)
-https://github.com/trevd/android_system_core_cpio (makefile)
-https://github.com/osm0sis/mkbootfs (patches)
-
 pxa-mkbootimg, pxa-unpackbootimg:
 https://github.com/AKuHAK/pxa-mkbootimg (initial source)
 https://github.com/osm0sis/pxa-mkbootimg (patches)
@@ -46,12 +41,15 @@ https://github.com/rockchip-linux/rkflashtool
 kernel_dump:
 https://forum.xda-developers.com/crossdevice-dev/sony/tool-unpack-format-sony-kernel-image-t3530077
 
-bzip2, chmod, cpio, cut, dd, file, gzip, lzop, printf, tail, xz;
+bzip2, chmod, cpio, cut, dd, file, find, gzip, lzop, printf, tail, xz;
 cygbz2-1, cygcrypto-1.0.0, cyggcc_s-1, cygiconv-2, cygintl-8, cyglzma-5, cyglzo2-2, cygmagic-1, cygssl-1.0.0, cygwin1, cygz:
-http://cygwin.com/
+https://cygwin.com/
 
 lz4:
 http://lz4.github.io/lz4/
+
+sudo:
+https://github.com/mattn/sudo
 
 magic:
 http://www.darwinsys.com/file/
