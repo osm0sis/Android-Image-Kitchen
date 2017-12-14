@@ -13,17 +13,34 @@ esac;
 aik="$(dirname "$(readlink -f "$aik")")";
 bin="$aik/bin";
 rel=bin;
+cur="$(readlink -f "$PWD")";
 
 abort() { cd "$aik"; echo "Error!"; }
 
 cd "$aik";
 bb=$bin/busybox;
 chmod -R 755 $bin *.sh;
-chmod 644 $bin/magic $bin/androidbootimg.magic $bin/BootSignature_Android.jar $bin/module.prop $bin/avb/* $bin/chromeos/*;
+chmod 644 $bin/magic $bin/androidbootimg.magic $bin/BootSignature_Android.jar $bin/module.prop $bin/ramdisk.img $bin/avb/* $bin/chromeos/*;
 
 if [ ! -f $bb ]; then
   bb=busybox;
 fi;
+
+case `$bb mount` in
+  *" $aik/ramdisk "*) ;;
+  *)
+    su -mm -c "$bb mount -t ext4 -o rw,noatime $aik/split_img/.aik-ramdisk.img $aik/ramdisk" 2>/dev/null;
+    if [ $? != "0" ]; then
+      for i in 0 1 2 3 4 5 6 7; do
+        loop=/dev/block/loop$i;
+        $bb mknod $loop b 7 $i 2>/dev/null;
+        $bb losetup $loop $aik/split_img/.aik-ramdisk.img 2>/dev/null;
+        test "$($bb losetup $loop | $bb grep $aik)" && break;
+      done;
+      su -mm -c "$bb mount -t ext4 -o loop,noatime $loop $aik/ramdisk" || return 1;
+    fi;
+  ;;
+esac;
 
 if [ -z "$(ls split_img/* 2>/dev/null)" -o -z "$(ls ramdisk/* 2>/dev/null)" ]; then
   echo "No files found to be packed/built.";
@@ -51,8 +68,8 @@ while [ "$1" ]; do
     ;;
     --avbkey)
       if [ "$2" ]; then
-        for keytest in "$2" "$aik/$2"; do
-          if [ -f "$keytest.pk8" -a -f "$keytest.x509.*" ]; then
+        for keytest in "$2" "$cur/$2" "$aik/$2"; do
+          if [ -f "$keytest.pk8" -a -f "$keytest.x509."* ]; then
             avbkey="$keytest"; avbtxt=" - Key: $2"; shift; break;
           fi;
         done;
@@ -79,7 +96,9 @@ else
     bzip2) compext=bz2;;
     lz4) repackcmd="$bin/lz4 $level -l";;
   esac;
-  $bin/mkbootfs ramdisk | $repackcmd > ramdisk-new.cpio.$compext;
+  cd ramdisk;
+  $bb find . | $bb cpio -H newc -o 2>/dev/null | $repackcmd > ../ramdisk-new.cpio.$compext;
+  cd ..;
   if [ $? != "0" ]; then
     abort;
     return 1;

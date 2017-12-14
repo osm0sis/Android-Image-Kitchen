@@ -13,20 +13,21 @@ esac;
 aik="$(dirname "$(readlink -f "$aik")")";
 bin="$aik/bin";
 rel=bin;
+cur="$(readlink -f "$PWD")";
 
-cleanup() { rm -rf ramdisk split_img *new.*; }
+cleanup() { $aik/cleanup.sh >/dev/null; }
 abort() { cd "$aik"; echo "Error!"; }
 
 cd "$aik";
 bb=$bin/busybox;
 chmod -R 755 $bin *.sh;
-chmod 644 $bin/magic $bin/androidbootimg.magic $bin/BootSignature_Android.jar $bin/module.prop $bin/avb/* $bin/chromeos/*;
+chmod 644 $bin/magic $bin/androidbootimg.magic $bin/BootSignature_Android.jar $bin/module.prop $bin/ramdisk.img $bin/avb/* $bin/chromeos/*;
 
 if [ ! -f $bb ]; then
   bb=busybox;
 fi;
 
-img="$1";
+test -f "$cur/$1" && img="$cur/$1" || img="$1";
 if [ ! "$img" ]; then
   $bb ls *.elf *.img *.sin 2>/dev/null |& while IFS= read -r -p line; do
     case $line in
@@ -57,6 +58,27 @@ fi;
 
 echo "Setting up work folders...\n";
 mkdir split_img ramdisk;
+chmod 755 split_img ramdisk;
+echo "run remount.sh to remount the current image's unpacked ramdisk" > ramdisk/README;
+chmod 666 ramdisk/README;
+cp -fp $bin/remount.sh ramdisk/remount.sh;
+cp -f $bin/ramdisk.img split_img/.aik-ramdisk.img;
+
+case `$bb mount` in
+  *" $aik/ramdisk "*) ;;
+  *)
+    su -mm -c "$bb mount -t ext4 -o rw,noatime $aik/split_img/.aik-ramdisk.img $aik/ramdisk" 2>/dev/null;
+    if [ $? != "0" ]; then
+      for i in 0 1 2 3 4 5 6 7; do
+        loop=/dev/block/loop$i;
+        $bb mknod $loop b 7 $i 2>/dev/null;
+        $bb losetup $loop $aik/split_img/.aik-ramdisk.img 2>/dev/null;
+        test "$($bb losetup $loop | $bb grep $aik)" && break;
+      done;
+      su -mm -c "$bb mount -t ext4 -o loop,noatime $loop $aik/ramdisk" || return 1;
+    fi;
+  ;;
+esac;
 
 imgtest="$($bin/file -m $rel/androidbootimg.magic "$img" | $bb cut -d: -f2-)";
 if [ "$(echo $imgtest | $bb awk '{ print $2 }' | $bb cut -d, -f1)" == "signing" ]; then

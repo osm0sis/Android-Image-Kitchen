@@ -32,6 +32,7 @@ case $1 in
   --uninstall)
     # remove AIK-mobile and shortcut script
     su -c " \
+      $aik/cleanup.sh >/dev/null; \
       if [ -e /su -o -e /sbin/supersu -o -e /magisk ]; then \
         rm -rf $aik /su/bin/aik /sbin/supersu/bin/aik /magisk/aik-mobile; \
       else \

@@ -99,6 +99,11 @@ set_perm_recursive 0 0 0755 0644 "/data/local/AIK-mobile/bin/avb" "/data/local/A
 set_perm 0 0 0644 "/data/local/AIK-mobile/authors.txt" "/data/local/AIK-mobile/bin/androidbootimg.magic" "/data/local/AIK-mobile/bin/BootSignature_Android.jar" "/data/local/AIK-mobile/bin/module.prop" "/data/local/AIK-mobile/bin/magic";
 set_progress 0.8;
 
+# Magisk clean flash support
+if [ -e /data/magisk -a ! -e /data/magisk.img ]; then
+  /system/bin/make_ext4fs -l 64M /data/magisk.img;
+fi;
+
 ui_print " ";
 suimg=$(ls /data/magisk_merge.img || ls /data/su.img || ls /cache/su.img || ls /data/magisk.img || ls /cache/magisk.img) 2>/dev/null;
 mnt=$dev/$(basename $suimg .img);
@@ -121,6 +126,7 @@ if [ "$suimg" ]; then
   esac;
   target=$mnt$magisk/bin;
 else
+  # SuperSU BINDSBIN support
   mnt=$(dirname `find /data -name supersu_is_here | head -n1`);
   if [ -e "$mnt" ]; then
     target=$mnt/bin;
@@ -137,7 +143,7 @@ if [ "$magisk" ]; then
   cp -f module.prop "$mnt/$modname/";
   touch "$mnt/$modname/auto_mount";
   chcon -hR 'u:object_r:system_file:s0' "$mnt/$modname";
-  if $BOOTMODE; then
+  if $BOOTMODE && [ "$suimg" == "/data/magisk_merge.img" ]; then
     mkdir -p "/magisk/$modname";
     touch "/magisk/$modname/update";
     cp -f module.prop "/magisk/$modname/";
@@ -159,7 +165,8 @@ ui_print " ";
 ui_print "Done!";
 ui_print " ";
 ui_print "Run 'aik' from the commandline when booted";
-ui_print "then 'unpackimg.sh -.img' to get started";
+ui_print "then 'unpackimg.sh -.img' to get started.";
+ui_print "Or, copy an .img and run from an explorer app.";
 set_progress 1.34;
 exit 0;
 
