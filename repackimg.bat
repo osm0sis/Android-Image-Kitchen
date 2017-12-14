@@ -2,13 +2,14 @@
 setlocal
 set CYGWIN=nodosfilewarning
 
+set "bin=%~dp0\android_win_tools"
+set "rel=android_win_tools"
+set "cur=%cd%"
 %~d0
 cd "%~p0"
 if "%~1" == "--help" echo usage: repackimg.bat [--original] [--level ^<0-9^>] [--avbkey ^<name^>] & goto end
 dir /a-d split_img >nul 2>&1 || goto nofiles
 dir /a-d ramdisk >nul 2>&1 || goto nofiles
-set "bin=%~dp0\android_win_tools"
-set "rel=android_win_tools"
 
 echo Android Image Kitchen - RepackImg Script
 echo by osm0sis @ xda-developers
@@ -37,9 +38,9 @@ if not "[%~1]" == "[]" (
     )
   )
   if "%~1" == "--avbkey" (
-    if not "[%~2]" == "[]" if exist "%~2.pk8" if exist "%~2.x509."* (
-      set "avbkey=%~2"
-      set "avbtxt= - Key: %~2"
+    if not "[%~2]" == "[]" (
+      if exist "%~2.pk8" if exist "%~2.x509."* set "avbkey=%~2" & set "avbtxt= - Key: %~2"
+      if exist "%cur%\%~2.pk8" if exist "%cur%\%~2.x509."* set "avbkey=%cur%\%~2" & set "avbtxt= - Key: %~2"
       shift
     )
   )
@@ -48,7 +49,14 @@ if not "[%~1]" == "[]" (
 )
 
 if defined original goto skipramdisk
-echo Packing ramdisk . . .
+"%bin%"\find ramdisk >nul 2>&1
+if errorlevel == 1 (
+  set "sumsg= (as root)"
+) else (
+  "%bin%"\find ramdisk 2>&1 | "%bin%"\cpio --quiet -o >nul 2>&1
+  if errorlevel == 1 set "sumsg= (as root)"
+)
+echo Packing ramdisk%sumsg% . . .
 echo.
 for /f "delims=" %%a in ('dir /b split_img\*-ramdiskcomp') do @set "ramdiskcname=%%a"
 for /f "delims=" %%a in ('type "split_img\%ramdiskcname%"') do @set "ramdiskcomp=%%a"
@@ -62,8 +70,17 @@ if "%ramdiskcomp%" == "lzma" set "repackcmd=xz -Flzma %level%" & set "compext=lz
 if "%ramdiskcomp%" == "xz" set "repackcmd=xz %level% -Ccrc32" & set "compext=xz"
 if "%ramdiskcomp%" == "bzip2" set "compext=bz2"
 if "%ramdiskcomp%" == "lz4" set "repackcmd=lz4 %level% -l" & set "compext=lz4"
-"%bin%"\mkbootfs ramdisk | "%bin%"\%repackcmd% > ramdisk-new.cpio.%compext%
+cd ramdisk
+if not "[%sumsg%]" == "[]" (
+  "%bin%"\sudo "%bin%"\find . | "%bin%"\sudo "%bin%"\cpio -H newc -R 0:0 -o -F ..\ramdisk-new.cpio 2>nul
+) else (
+  "%bin%"\find . | "%bin%"\cpio -H newc -R 0:0 -o -F ..\ramdisk-new.cpio 2>nul
+)
 if errorlevel == 1 goto error
+cd ..
+type ramdisk-new.cpio | "%bin%"\%repackcmd% > ramdisk-new.cpio.%compext%
+if errorlevel == 1 goto error
+del ramdisk-new.cpio
 :skipramdisk
 echo.
 
@@ -78,13 +95,14 @@ for /f "delims=" %%a in ('dir /b split_img\*-zImage') do @set "kernelname=%%a"
 echo kernel = %kernelname% & set "kernel=split_img/%kernelname%"
 :skipzimg
 for /f "delims=" %%a in ('dir /b split_img\*-ramdisk.cpio*') do @set "ramdiskname=%%a"
-if defined original (
-  echo ramdisk = %ramdiskname%
-  set "ramdisk=split_img/%ramdiskname%"
-) else (
+if not defined original (
   set "ramdiskname=ramdisk-new.cpio.%compext%"
   set "ramdisk=ramdisk-new.cpio.%compext%"
+  goto skiporig
 )
+echo ramdisk = %ramdiskname%
+set "ramdisk=split_img/"%ramdiskname%""
+:skiporig
 if "%imgtype%" == "KRNL" (
   for %%i in (%ramdisk%) do @echo ramdisk_size = %%~z%i
 )
