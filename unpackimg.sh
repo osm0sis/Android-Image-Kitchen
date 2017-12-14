@@ -2,26 +2,47 @@
 # AIK-Linux/unpackimg: split image and unpack ramdisk
 # osm0sis @ xda-developers
 
-cleanup() { $sudo$rmsu rm -rf ramdisk split_img *new.*; }
+cleanup() { $aik/cleanup.sh >/dev/null; }
 abort() { cd "$aik"; echo "Error!"; }
 
 case $1 in
-  --help) echo "usage: unpackimg.sh [--sudo] <file>"; exit 1;;
-  --sudo) sudo=sudo; sumsg=" (as root)"; shift;;
+  --help) echo "usage: unpackimg.sh <file>"; exit 1;;
+  --sudo) shift;;
 esac;
+
+case $(uname -s) in
+  Darwin|Macintosh)
+    plat="macos";
+    readlink() { perl -MCwd -e 'print Cwd::abs_path shift' "$2"; }
+  ;;
+  *) plat="linux";;
+esac;
+arch=$plat/`uname -m`;
 
 aik="${BASH_SOURCE:-$0}";
 aik="$(dirname "$(readlink -f "$aik")")";
 bin="$aik/bin";
 rel=bin;
+cur="$(readlink -f "$PWD")";
+
+case $plat in
+  macos)
+    cpio="DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/cpio"";
+    dd() { DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/dd" "$@"; }
+    file() { DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/file" "$@"; }
+    lzma() { DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/xz" "$@"; }
+    lzop() { DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/lzop" "$@"; }
+    tail() { DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/tail" "$@"; }
+    xz() { DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/xz" "$@"; }
+  ;;
+  linux) cpio=cpio;;
+esac;
 
 cd "$aik";
 chmod -R 755 "$bin" *.sh;
 chmod 644 "$bin/magic" "$bin/androidbootimg.magic" "$bin/BootSignature.jar" "$bin/avb/"* "$bin/chromeos/"*;
 
-arch=`uname -m`;
-
-img="$1";
+test -f "$cur/$1" && img="$cur/$1" || img="$1";
 if [ ! "$img" ]; then
   while IFS= read -r line; do
     case $line in
@@ -49,10 +70,7 @@ echo "Supplied image: $file";
 echo " ";
 
 if [ -d split_img -o -d ramdisk ]; then
-  if [ ! -z "$(ls ramdisk/* 2>/dev/null)" ] && [ "$(stat -c %U ramdisk/* | head -n 1)" = "root" ]; then
-    test ! "$sudo" && rmsu=sudo; rmsumsg=" (as root)";
-  fi;
-  echo "Removing old work folders and files$rmsumsg...";
+  echo "Removing old work folders and files (as root)...";
   echo " ";
   cleanup;
 fi;
@@ -125,7 +143,7 @@ if [ "$(echo $imgtest | awk '{ print $3 }')" = "LOKI" ]; then
   img="$file";
 fi;
 
-tailtest="$(tail "$img" 2>/dev/null | file -m $rel/androidbootimg.magic - | cut -d: -f2-)";
+tailtest="$(tail -n50 "$img" 2>/dev/null | file -m $rel/androidbootimg.magic - | cut -d: -f2-)";
 tailtype="$(echo $tailtest | awk '{ print $1 }')";
 case $tailtype in
   AVB)
@@ -255,8 +273,9 @@ if [ "$ramdiskcomp" = "data" ]; then
 fi;
 
 echo " ";
-echo "Unpacking ramdisk$sumsg to \"ramdisk/\"...";
+echo "Unpacking ramdisk (as root) to \"ramdisk/\"...";
 echo " ";
+sudo chown 0:0 ramdisk;
 cd ramdisk;
 echo "Compression used: $ramdiskcomp";
 if [ ! "$compext" ]; then
@@ -264,9 +283,8 @@ if [ ! "$compext" ]; then
   abort;
   exit 1;
 fi;
-$unpackcmd "../split_img/$file-ramdisk.cpio$compext" | $sudo cpio -i -d --no-absolute-filenames;
+$unpackcmd "../split_img/$file-ramdisk.cpio$compext" | sudo $cpio -i -d --no-absolute-filenames;
 if [ ! $? -eq "0" ]; then
-  echo "Unpacking failed, try ./unpackimg.sh --sudo";
   abort;
   exit 1;
 fi;
