@@ -25,20 +25,25 @@ cur="$(readlink -f "$PWD")";
 
 case $plat in
   macos)
-    cpio="DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/cpio"";
+    cpio="env DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/cpio"";
+    statarg="-f %Su";
     dd() { DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/dd" "$@"; }
     java() { "/Library/Internet Plug-Ins/JavaAppletPlugin.plugin/Contents/Home/bin/java" "$@"; }
     lzop() { DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/lzop" "$@"; }
     xz() { DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/xz" "$@"; }
   ;;
-  linux) cpio=cpio;;
+  linux)
+    cpio=cpio;
+    statarg="-c %U";
+  ;;
 esac;
 
 cd "$aik";
 chmod -R 755 "$bin" *.sh;
 chmod 644 "$bin/magic" "$bin/androidbootimg.magic" "$bin/BootSignature.jar" "$bin/avb/"* "$bin/chromeos/"*;
 
-if [ -z "$(ls split_img/* 2>/dev/null)" -o -z "$(ls ramdisk/* 2>/dev/null)" ]; then
+ramdiskcomp=`cat split_img/*-ramdiskcomp 2>/dev/null`;
+if [ -z "$(ls split_img/* 2>/dev/null)" -o -z "$(ls ramdisk/* 2>/dev/null)" -a ! "$ramdiskcomp" = "empty" ]; then
   echo "No files found to be packed/built.";
   abort;
   exit 1;
@@ -53,6 +58,12 @@ echo " ";
 if [ ! -z "$(ls *-new.* 2>/dev/null)" ]; then
   echo "Warning: Overwriting existing files!";
   echo " ";
+fi;
+
+if [ -d ramdisk ] && [ "$(stat $statarg ramdisk | head -n 1)" = "root" ]; then
+  sudo=sudo; sumsg=" (as root)";
+else
+  cpioarg="-R 0:0";
 fi;
 
 rm -f "*-new.*";
@@ -80,10 +91,13 @@ done;
 
 if [ "$original" ]; then
   echo "Repacking with original ramdisk...";
+elif [ "$ramdiskcomp" = "empty" ]; then
+  echo "Warning: Using empty ramdisk for repack!";
+  compext=empty;
+  touch ramdisk-new.cpio.$compext;
 else
-  echo "Packing ramdisk (as root)...";
+  echo "Packing ramdisk$sumsg...";
   echo " ";
-  ramdiskcomp=`cat split_img/*-ramdiskcomp`;
   test -z "$level" -a "$ramdiskcomp" = "xz" && level=-1;
   echo "Using compression: $ramdiskcomp$lvltxt";
   repackcmd="$ramdiskcomp $level";
@@ -98,12 +112,12 @@ else
     *) abort; exit 1;;
   esac;
   cd ramdisk;
-  sudo find . | sudo $cpio -H newc -o 2>/dev/null | $repackcmd > ../ramdisk-new.cpio.$compext;
-  cd ..;
+  $sudo find . | $sudo $cpio $cpioarg -H newc -o 2>/dev/null | $repackcmd > ../ramdisk-new.cpio.$compext;
   if [ ! $? -eq "0" ]; then
     abort;
     exit 1;
   fi;
+  cd ..;
 fi;
 
 echo " ";
@@ -209,8 +223,11 @@ echo " ";
 case $imgtype in
   AOSP) "$bin/$arch/mkbootimg" --kernel "$kernel" --ramdisk "$ramdisk" "${second[@]}" --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --os_version "$osver" --os_patch_level "$oslvl" $hash "${dtb[@]}" -o $outname;;
   AOSP-PXA) "$bin/$arch/pxa-mkbootimg" --kernel "$kernel" --ramdisk "$ramdisk" "${second[@]}" --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --unknown $unknown "${dtb[@]}" -o $outname;;
-  U-Boot) "$bin/$arch/mkimage" -A $uarch -O $os -T $type -C $comp -a $addr -e $ep -n "$name" -d "$kernel":"$ramdisk" $outname >/dev/null;;
   KRNL) "$bin/$arch/rkcrc" -k "$ramdisk" $outname;;
+  U-Boot)
+    test "$type" == "Multi" && uramdisk=(:"$ramdisk");
+    "$bin/$arch/mkimage" -A $uarch -O $os -T $type -C $comp -a $addr -e $ep -n "$name" -d "$kernel""${uramdisk[@]}" $outname >/dev/null;
+  ;;
   *) echo " "; echo "Unsupported format."; abort; exit 1;;
 esac;
 if [ ! $? -eq "0" ]; then

@@ -6,9 +6,13 @@ cleanup() { $aik/cleanup.sh >/dev/null; }
 abort() { cd "$aik"; echo "Error!"; }
 
 case $1 in
-  --help) echo "usage: unpackimg.sh <file>"; exit 1;;
+  --help) echo "usage: unpackimg.sh [--nosudo] <file>"; exit 1;;
+  --nosudo) nosudo=1; shift;;
   --sudo) shift;;
 esac;
+if [ ! "$nosudo" ]; then
+  sudo=sudo; sumsg=" (as root)";
+fi;
 
 case $(uname -s) in
   Darwin|Macintosh)
@@ -27,7 +31,8 @@ cur="$(readlink -f "$PWD")";
 
 case $plat in
   macos)
-    cpio="DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/cpio"";
+    cpio="env DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/cpio"";
+    statarg="-f %Su";
     dd() { DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/dd" "$@"; }
     file() { DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/file" "$@"; }
     lzma() { DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/xz" "$@"; }
@@ -35,7 +40,10 @@ case $plat in
     tail() { DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/tail" "$@"; }
     xz() { DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/xz" "$@"; }
   ;;
-  linux) cpio=cpio;;
+  linux)
+    cpio=cpio;
+    statarg="-c %U";
+  ;;
 esac;
 
 cd "$aik";
@@ -70,7 +78,10 @@ echo "Supplied image: $file";
 echo " ";
 
 if [ -d split_img -o -d ramdisk ]; then
-  echo "Removing old work folders and files (as root)...";
+  if [ -d ramdisk ] && [ "$(stat $statarg ramdisk | head -n 1)" = "root" -o ! "$(find ramdisk 2>&1 | cpio -o >/dev/null 2>&1; echo $?)" -eq "0" ]; then
+    rmsumsg=" (as root)";
+  fi;
+  echo "Removing old work folders and files$rmsumsg...";
   echo " ";
   cleanup;
 fi;
@@ -183,14 +194,11 @@ case $imgtype in
       abort;
       exit 1;
     fi;
-    if [ ! "$(cat "$file-type")" = "Multi" ]; then
-      echo " ";
-      echo "No ramdisk found.";
-      cleanup;
-      abort;
-      exit 1;
+    if [ "$(cat "$file-type")" = "Multi" ]; then
+      "$bin/$arch/dumpimage" -i "$img" -p 1 "$file-ramdisk.cpio.gz";
+    else
+      touch "$file-ramdisk.cpio.gz";
     fi;
-    "$bin/$arch/dumpimage" -i "$img" -p 1 "$file-ramdisk.cpio.gz";
   ;;
 esac;
 if [ ! $? -eq "0" ]; then
@@ -259,6 +267,7 @@ case $ramdiskcomp in
   lzma) ;;
   bzip2) compext=bz2;;
   lz4) unpackcmd="$bin/$arch/lz4 -dcq";;
+  empty) compext=empty;;
   *) compext="";;
 esac;
 if [ "$compext" ]; then
@@ -273,22 +282,27 @@ if [ "$ramdiskcomp" = "data" ]; then
 fi;
 
 echo " ";
-echo "Unpacking ramdisk (as root) to \"ramdisk/\"...";
-echo " ";
-sudo chown 0:0 ramdisk;
-cd ramdisk;
-echo "Compression used: $ramdiskcomp";
-if [ ! "$compext" ]; then
-  echo "Unsupported format.";
-  abort;
-  exit 1;
+if [ "$ramdiskcomp" = "empty" ]; then
+  echo "Warning: No ramdisk found to be unpacked!";
+else
+  echo "Unpacking ramdisk$sumsg to \"ramdisk/\"...";
+  echo " ";
+  $sudo chown 0:0 ramdisk 2>/dev/null;
+  cd ramdisk;
+  echo "Compression used: $ramdiskcomp";
+  if [ ! "$compext" ]; then
+    echo "Unsupported format.";
+    abort;
+    exit 1;
+  fi;
+  $unpackcmd "../split_img/$file-ramdisk.cpio$compext" | $sudo $cpio -i -d --no-absolute-filenames;
+  if [ ! $? -eq "0" ]; then
+    test "$nosudo" && echo "Unpacking failed, try without --nosudo.";
+    abort;
+    exit 1;
+  fi;
+  cd ..;
 fi;
-$unpackcmd "../split_img/$file-ramdisk.cpio$compext" | sudo $cpio -i -d --no-absolute-filenames;
-if [ ! $? -eq "0" ]; then
-  abort;
-  exit 1;
-fi;
-cd ..;
 
 echo " ";
 echo "Done!";
