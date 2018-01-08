@@ -9,7 +9,9 @@ set "cur=%cd%"
 cd "%~p0"
 if "%~1" == "--help" echo usage: repackimg.bat [--original] [--level ^<0-9^>] [--avbkey ^<name^>] & goto end
 dir /a-d split_img >nul 2>&1 || goto nofiles
-dir /a-d ramdisk >nul 2>&1 || goto nofiles
+for /f "delims=" %%a in ('dir /b split_img\*-ramdiskcomp') do @set "ramdiskcname=%%a"
+for /f "delims=" %%a in ('type "split_img\%ramdiskcname%"') do @set "ramdiskcomp=%%a"
+dir /a-d ramdisk >nul 2>&1 || if not "%ramdiskcomp%" == "empty" goto nofiles
 
 echo Android Image Kitchen - RepackImg Script
 echo by osm0sis @ xda-developers
@@ -49,6 +51,12 @@ if not "[%~1]" == "[]" (
 )
 
 if defined original goto skipramdisk
+if "%ramdiskcomp%" == "empty" (
+  echo Warning: Using empty ramdisk for repack!
+  set "compext=empty"
+  copy /y nul ramdisk-new.cpio.empty >nul
+  goto skipramdisk
+)
 "%bin%"\find ramdisk >nul 2>&1
 if errorlevel == 1 (
   set "sumsg= (as root)"
@@ -58,8 +66,6 @@ if errorlevel == 1 (
 )
 echo Packing ramdisk%sumsg% . . .
 echo.
-for /f "delims=" %%a in ('dir /b split_img\*-ramdiskcomp') do @set "ramdiskcname=%%a"
-for /f "delims=" %%a in ('type "split_img\%ramdiskcname%"') do @set "ramdiskcomp=%%a"
 if not defined level if "%ramdiskcomp%" == "xz" set "level=-1"
 
 echo Using compression: %ramdiskcomp%%lvltxt%
@@ -220,7 +226,8 @@ if "%imgtype%" == "ELF" set "imgtype=AOSP" & echo Warning: ELF format detected; 
 if "%imgtype%" == "AOSP" set "buildcmd=mkbootimg --kernel "%kernel%" --ramdisk "%ramdisk%" %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% --second_offset "%secondoff%" --tags_offset "%tagsoff%" --os_version "%osver%" --os_patch_level "%oslvl%" %hash% %dtb% -o %outname%"
 if "%imgtype%" == "AOSP-PXA" set "buildcmd=pxa-mkbootimg --kernel "%kernel%" --ramdisk "%ramdisk%" %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% --second_offset "%secondoff%" --tags_offset "%tagsoff%" --unknown "%unknown%" %dtb% -o %outname%"
 if "%imgtype%" == "KRNL" set "buildcmd=rkcrc -k "%ramdisk%" %outname%"
-if "%imgtype%" == "U-Boot" set "buildcmd=mkimage -A %arch% -O %os% -T %type% -C %comp% -a %addr% -e %ep% -n "%name%" -d "%kernel%":"%ramdisk%" %outname% >nul"
+if "%imgtype%" == "U-Boot" if "%type%" == "Multi" set "uramdisk=:%ramdisk%"
+if "%imgtype%" == "U-Boot" set "buildcmd=mkimage -A %arch% -O %os% -T %type% -C %comp% -a %addr% -e %ep% -n "%name%" -d "%kernel%"%uramdisk% %outname% >nul"
 
 echo Building image . . .
 echo.
