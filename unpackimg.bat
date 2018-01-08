@@ -151,9 +151,13 @@ if "%imgtype%" == "U-Boot" (
   del "%~nx1-header"
   "%bin%"\dumpimage -i "%file%" -p 0 "%~nx1-zImage"
   for /f "delims=" %%a in ('type "%~nx1-type"') do (
-    if not "%%a" == "Multi" echo. & echo No ramdisk found. & call "%aik%\cleanup.bat" >nul & goto error
+    if "%%a" == "Multi" (
+      "%bin%"\dumpimage -i "%file%" -p 1 "%~nx1-ramdisk.cpio.gz"
+    ) else (
+      copy /y nul "%~nx1-ramdisk.cpio.gz" >nul
+    )
   )
-  "%bin%"\dumpimage -i "%file%" -p 1 "%~nx1-ramdisk.cpio.gz"
+  
 )
 if errorlevel == 1 call "%aik%\cleanup.bat" >nul & goto error
 echo.
@@ -217,10 +221,12 @@ if "%ramdiskcomp%" == "lzma" set "unpackcmd=xz -dc" & set "compext=lzma"
 if "%ramdiskcomp%" == "xz" set "unpackcmd=xz -dc" & set "compext=xz"
 if "%ramdiskcomp%" == "bzip2" set "unpackcmd=bzip2 -dc" & set "compext=bz2"
 if "%ramdiskcomp%" == "lz4" set "unpackcmd=lz4 -dcq" & set "compext=lz4"
+if "%ramdiskcomp%" == "empty" set "compext=empty"
 ren *ramdisk*.gz *ramdisk.cpio.%compext%
 cd ..
 if "%ramdiskcomp%" == "data" echo Unrecognized format. & goto error
 
+if "%ramdiskcomp%" == "empty" echo Warning: No ramdisk found to be unpacked! & goto nord
 echo Unpacking ramdisk to "ramdisk/" . . .
 echo.
 cd ramdisk
@@ -230,6 +236,7 @@ if not defined compext echo. & echo Unsupported format. & goto error
 "%bin%"\%unpackcmd% "..\split_img\%~nx1-ramdisk.cpio.%compext%" | "%bin%"\cpio -i -d --no-absolute-filenames
 if errorlevel == 1 goto error
 cd ..
+:nord
 "%bin%"\chmod -f 755 ramdisk >nul 2>&1
 echo.
 
