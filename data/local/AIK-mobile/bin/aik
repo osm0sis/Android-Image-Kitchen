@@ -4,11 +4,12 @@
 
 aik=/data/local/AIK-mobile;
 bb=$aik/bin/busybox;
+test "$($bb ps | $bb grep zygote | $bb grep -v grep)" && su=su || su=sh;
 
 case $1 in
   --restore)
     # fix shortcut script
-    su -c " \
+    $su -c " \
       if [ -e /su ]; then \
         cp -pf $aik/bin/aik /su/bin/aik; \
       elif [ -e /sbin/supersu ]; then \
@@ -31,7 +32,7 @@ case $1 in
   ;;
   --uninstall)
     # remove AIK-mobile and shortcut script
-    su -c " \
+    $su -c " \
       $aik/cleanup.sh >/dev/null; \
       if [ -e /su -o -e /sbin/supersu -o -e /magisk ]; then \
         rm -rf $aik /su/bin/aik /sbin/supersu/bin/aik /magisk/aik-mobile; \
@@ -50,7 +51,7 @@ case $1 in
   *)
     # go local and request root
     cd $aik;
-    PATH="$PATH:$aik" su;
+    PATH="$PATH:$aik" $su;
   ;;
 esac;
 

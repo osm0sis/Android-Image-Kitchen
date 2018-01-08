@@ -19,12 +19,14 @@ if [ ! -f $bb ]; then
   bb=busybox;
 fi;
 
+test "$($bb ps | $bb grep zygote | $bb grep -v grep)" && su="su -mm" || su=sh;
+
 cd "$aik";
 loop=$($bb mount | $bb grep $aik/ramdisk | $bb cut -d" " -f1);
-su -mm -c "$bb umount $aik/ramdisk" 2>/dev/null;
+$su -c "$bb umount $aik/ramdisk" 2>/dev/null;
 $bb losetup -d $loop 2>/dev/null;
 
-rm -rf ramdisk split_img *new.*;
+rm -rf ramdisk split_img *new.* || return 1;
 
 echo "Working directory cleaned.";
 return 0;

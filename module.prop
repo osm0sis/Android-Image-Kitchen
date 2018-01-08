@@ -1,7 +1,7 @@
 id=aik-mobile
 name=AIK-mobile (helper script)
-version=3.0
-versionCode=300
+version=3.1
+versionCode=310
 author=osm0sis @ xda-developers
 description=Android Image Kitchen: Mobile Edition - easily unpack, modify and repack kernel/recovery ramdisks on the go
 support=http://forum.xda-developers.com/showthread.php?t=2073775

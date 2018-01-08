@@ -26,10 +26,18 @@ if [ ! -f $bb ]; then
   bb=busybox;
 fi;
 
+test "$($bb ps | $bb grep zygote | $bb grep -v grep)" && su="su -mm" || su=sh;
+
+if [ -z "$(ls split_img/* 2>/dev/null)" -o ! -e ramdisk ]; then
+  echo "No files found to be packed/built.";
+  abort;
+  return 1;
+fi;
+
 case `$bb mount` in
   *" $aik/ramdisk "*) ;;
   *)
-    su -mm -c "$bb mount -t ext4 -o rw,noatime $aik/split_img/.aik-ramdisk.img $aik/ramdisk" 2>/dev/null;
+    $su -c "$bb mount -t ext4 -o rw,noatime $aik/split_img/.aik-ramdisk.img $aik/ramdisk" 2>/dev/null;
     if [ $? != "0" ]; then
       for i in 0 1 2 3 4 5 6 7; do
         loop=/dev/block/loop$i;
@@ -37,12 +45,13 @@ case `$bb mount` in
         $bb losetup $loop $aik/split_img/.aik-ramdisk.img 2>/dev/null;
         test "$($bb losetup $loop | $bb grep $aik)" && break;
       done;
-      su -mm -c "$bb mount -t ext4 -o loop,noatime $loop $aik/ramdisk" || return 1;
+      $su -c "$bb mount -t ext4 -o loop,noatime $loop $aik/ramdisk" || return 1;
     fi;
   ;;
 esac;
 
-if [ -z "$(ls split_img/* 2>/dev/null)" -o -z "$(ls ramdisk/* 2>/dev/null)" ]; then
+ramdiskcomp=`cat split_img/*-ramdiskcomp`;
+if [ -z "$(ls ramdisk/* 2>/dev/null)" -a ! "$ramdiskcomp" == "empty" ]; then
   echo "No files found to be packed/built.";
   abort;
   return 1;
@@ -81,9 +90,12 @@ done;
 
 if [ "$original" ]; then
   echo "Repacking with original ramdisk...";
+elif [ "$ramdiskcomp" == "empty" ]; then
+  echo "Warning: Using empty ramdisk for repack!";
+  compext=empty;
+  touch ramdisk-new.cpio.$compext;
 else
   echo "Packing ramdisk...\n";
-  ramdiskcomp=`cat split_img/*-ramdiskcomp`;
   test ! "$level" -a "$ramdiskcomp" == "xz" && level=-1;
   echo "Using compression: $ramdiskcomp$lvltxt";
   repackcmd="$bb $ramdiskcomp $level";
@@ -98,11 +110,11 @@ else
   esac;
   cd ramdisk;
   $bb find . | $bb cpio -H newc -o 2>/dev/null | $repackcmd > ../ramdisk-new.cpio.$compext;
-  cd ..;
   if [ $? != "0" ]; then
     abort;
     return 1;
   fi;
+  cd ..;
 fi;
 
 echo "\nGetting build information...";
@@ -201,9 +213,12 @@ echo "Using format: $imgtype\n";
 case $imgtype in
   AOSP) $bin/mkbootimg --kernel "$kernel" --ramdisk "$ramdisk" "${second[@]}" --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --os_version "$osver" --os_patch_level "$oslvl" $hash "${dtb[@]}" -o $outname;;
   AOSP-PXA) $bin/pxa-mkbootimg --kernel "$kernel" --ramdisk "$ramdisk" "${second[@]}" --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --unknown $unknown "${dtb[@]}" -o $outname;;
-  U-Boot) $bin/mkimage -A $arch -O $os -T $type -C $comp -a $addr -e $ep -n "$name" -d "$kernel":"$ramdisk" $outname >/dev/null;;
   KRNL) $bin/rkcrc -k "$ramdisk" $outname;;
-  *) echo "\nUnsupported format."; abort; exit 1;;
+  U-Boot)
+    test "$type" == "Multi" && uramdisk=(:"$ramdisk");
+    $bin/mkimage -A $arch -O $os -T $type -C $comp -a $addr -e $ep -n "$name" -d "$kernel""${uramdisk[@]}" $outname >/dev/null;
+  ;;
+  *) echo "\nUnsupported format."; abort; return 1;;
 esac;
 if [ $? != "0" ]; then
   abort;
@@ -238,7 +253,7 @@ if [ -f split_img/*-sigtype ]; then
   esac;
   if [ $? != "0" ]; then
     abort;
-    exit 1;
+    return 1;
   fi;
 fi;
 

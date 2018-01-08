@@ -27,6 +27,8 @@ if [ ! -f $bb ]; then
   bb=busybox;
 fi;
 
+test "$($bb ps | $bb grep zygote | $bb grep -v grep)" && su="su -mm" || su=sh;
+
 test -f "$cur/$1" && img="$cur/$1" || img="$1";
 if [ ! "$img" ]; then
   $bb ls *.elf *.img *.sin 2>/dev/null |& while IFS= read -r -p line; do
@@ -67,7 +69,7 @@ cp -f $bin/ramdisk.img split_img/.aik-ramdisk.img;
 case `$bb mount` in
   *" $aik/ramdisk "*) ;;
   *)
-    su -mm -c "$bb mount -t ext4 -o rw,noatime $aik/split_img/.aik-ramdisk.img $aik/ramdisk" 2>/dev/null;
+    $su -c "$bb mount -t ext4 -o rw,noatime $aik/split_img/.aik-ramdisk.img $aik/ramdisk" 2>/dev/null;
     if [ $? != "0" ]; then
       for i in 0 1 2 3 4 5 6 7; do
         loop=/dev/block/loop$i;
@@ -75,7 +77,7 @@ case `$bb mount` in
         $bb losetup $loop $aik/split_img/.aik-ramdisk.img 2>/dev/null;
         test "$($bb losetup $loop | $bb grep $aik)" && break;
       done;
-      su -mm -c "$bb mount -t ext4 -o loop,noatime $loop $aik/ramdisk" || return 1;
+      $su -c "$bb mount -t ext4 -o loop,noatime $loop $aik/ramdisk" || return 1;
     fi;
   ;;
 esac;
@@ -184,13 +186,11 @@ case $imgtype in
       abort;
       return 1;
     fi;
-    if [ "$(cat "$file-type")" != "Multi" ]; then
-      echo "\nNo ramdisk found.";
-      cleanup;
-      abort;
-      return 1;
+    if [ "$(cat "$file-type")" == "Multi" ]; then
+      $bin/dumpimage -i "$img" -p 1 "$file-ramdisk.cpio.gz";
+    else
+      touch "$file-ramdisk.cpio.gz";
     fi;
-    $bin/dumpimage -i "$img" -p 1 "$file-ramdisk.cpio.gz";
   ;;
 esac;
 if [ $? != "0" ]; then
@@ -255,6 +255,7 @@ case $ramdiskcomp in
   lzma) unpackcmd="$bin/xz -dc";;
   bzip2) compext=bz2;;
   lz4) unpackcmd="$bin/lz4 -dcq";;
+  empty) compext=empty;;
   *) compext="";;
 esac;
 if [ "$compext" ]; then
@@ -268,20 +269,24 @@ if [ "$ramdiskcomp" == "data" ]; then
   return 1;
 fi;
 
-echo '\nUnpacking ramdisk to "ramdisk/"...\n';
-cd ramdisk;
-echo "Compression used: $ramdiskcomp";
-if [ ! "$compext" ]; then
-  echo "Unsupported format.";
-  abort;
-  return 1;
+if [ "$ramdiskcomp" == "empty" ]; then
+  echo "\nWarning: No ramdisk found to be unpacked!";
+else
+  echo '\nUnpacking ramdisk to "ramdisk/"...\n';
+  cd ramdisk;
+  echo "Compression used: $ramdiskcomp";
+  if [ ! "$compext" ]; then
+    echo "Unsupported format.";
+    abort;
+    return 1;
+  fi;
+  $unpackcmd "../split_img/$file-ramdisk.cpio$compext" | $bb cpio -i -d 2>&1;
+  if [ $? != "0" ]; then
+    abort;
+    return 1;
+  fi;
+  cd ..;
 fi;
-$unpackcmd "../split_img/$file-ramdisk.cpio$compext" | $bb cpio -i -d 2>&1;
-if [ $? != "0" ]; then
-  abort;
-  return 1;
-fi;
-cd ..;
 
 echo "\nDone!";
 return 0;

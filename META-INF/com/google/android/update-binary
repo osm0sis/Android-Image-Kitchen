@@ -6,13 +6,14 @@ OUTFD=/proc/self/fd/$2;
 ZIPFILE="$3";
 
 # Magisk boot mode support
+test -e /data/adb/magisk && adb=adb;
 ps | grep zygote | grep -v grep >/dev/null && BOOTMODE=true || BOOTMODE=false;
 $BOOTMODE || ps -A 2>/dev/null | grep zygote | grep -v grep >/dev/null && BOOTMODE=true;
 if $BOOTMODE; then
   OUTFD=/proc/self/fd/0;
   dev=/dev;
-  if [ ! -f /data/magisk_merge.img ]; then
-    /system/bin/make_ext4fs -l 64M /data/magisk_merge.img > /dev/null;
+  if [ ! -f /data/$adb/magisk_merge.img ]; then
+    /system/bin/make_ext4fs -l 64M /data/$adb/magisk_merge.img > /dev/null;
   fi;
 fi;
 
@@ -91,6 +92,7 @@ case $abi in
   *) ui_print "Unknown architecture: $abi"; abort;;
 esac;
 ui_print "Using architecture: $arch";
+rm -r /data/local/AIK-mobile;
 cp -rf data/* /data;
 cp -rf bin/$arch/* /data/local/AIK-mobile/bin/;
 cp -f module.prop /data/local/AIK-mobile/bin/;
@@ -100,12 +102,12 @@ set_perm 0 0 0644 "/data/local/AIK-mobile/authors.txt" "/data/local/AIK-mobile/b
 set_progress 0.8;
 
 # Magisk clean flash support
-if [ -e /data/magisk -a ! -e /data/magisk.img ]; then
-  /system/bin/make_ext4fs -l 64M /data/magisk.img;
+if [ -e /data/$adb/magisk -a ! -e /data/$adb/magisk.img ]; then
+  /system/bin/make_ext4fs -l 64M /data/$adb/magisk.img;
 fi;
 
 ui_print " ";
-suimg=$(ls /data/magisk_merge.img || ls /data/su.img || ls /cache/su.img || ls /data/magisk.img || ls /cache/magisk.img) 2>/dev/null;
+suimg=$(ls /data/$adb/magisk_merge.img || ls /data/su.img || ls /cache/su.img || ls /data/$adb/magisk.img || ls /cache/magisk.img) 2>/dev/null;
 mnt=$dev/$(basename $suimg .img);
 if [ "$suimg" ]; then
   umount $mnt;
@@ -143,7 +145,7 @@ if [ "$magisk" ]; then
   cp -f module.prop "$mnt/$modname/";
   touch "$mnt/$modname/auto_mount";
   chcon -hR 'u:object_r:system_file:s0' "$mnt/$modname";
-  if $BOOTMODE && [ "$suimg" == "/data/magisk_merge.img" ]; then
+  if $BOOTMODE && [ "$suimg" == "/data/$adb/magisk_merge.img" ]; then
     mkdir -p "/magisk/$modname";
     touch "/magisk/$modname/update";
     cp -f module.prop "/magisk/$modname/";
