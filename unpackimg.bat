@@ -74,6 +74,11 @@ if "%sigtype%" == "NOOK" (
   "%bin%"\dd bs=1048576 skip=1 conv=notrunc if="%file%" of="%~nx1" 2>nul
   set "file=%~nx1"
 )
+if "%sigtype%" == "NOOKTAB" (
+  "%bin%"\dd bs=262144 count=1 conv=notrunc if="%file%" of="%~nx1-master_boot.key" 2>nul
+  "%bin%"\dd bs=262144 skip=1 conv=notrunc if="%file%" of="%~nx1" 2>nul
+  set "file=%~nx1"
+)
 if "%sigtype%" == "SIN" (
   "%bin%"\kernel_dump . "%file%" >nul
   move /y "%~nx1."* "%~nx1" >nul 2>&1
@@ -136,7 +141,13 @@ echo Splitting image to "split_img/" . . .
 echo.
 if "%imgtype%" == "AOSP" "%bin%"\unpackbootimg -i "%file%"
 if "%imgtype%" == "AOSP-PXA" "%bin%"\pxa-unpackbootimg -i "%file%"
-if "%imgtype%" == "ELF" "%bin%"\unpackelf -i "%file%"
+if "%imgtype%" == "ELF" (
+  md elftool_out
+  "%bin%"\elftool unpack -i "%file%" -o elftool_out >nul
+  move /y elftool_out\header "%~nx1-header" >nul 2>&1
+  rd /s /q elftool_out >nul 2>&1
+  "%bin%"\unpackelf -i "%file%"
+)
 if "%imgtype%" == "KRNL" "%bin%"\dd bs=4096 skip=8 iflag=skip_bytes conv=notrunc if="%file%" of="%~nx1-ramdisk.cpio.gz" 2>&1 | "%bin%"\tail -n+3 | "%bin%"\cut -d" " -f1-2
 if "%imgtype%" == "U-Boot" (
   "%bin%"\dumpimage -l "%file%"
@@ -157,7 +168,6 @@ if "%imgtype%" == "U-Boot" (
       copy /y nul "%~nx1-ramdisk.cpio.gz" >nul
     )
   )
-  
 )
 if errorlevel == 1 call "%aik%\cleanup.bat" >nul & goto error
 echo.
@@ -200,17 +210,16 @@ del "%~nx1-mtktest"
 if defined mtk echo.
 
 if exist "*-dtb" (
-  "%bin%"\file -m %rel%\androidbootimg.magic *-dtb | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-dtbtest"
-  for /f "delims=" %%a in ('type "%~nx1-dtbtest"') do (
+  "%bin%"\file -m %rel%\androidbootimg.magic *-dtb | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-dtbtype"
+  for /f "delims=" %%a in ('type "%~nx1-dtbtype"') do (
     if "%imgtype%" == "ELF" if not "%%a" == "QCDT" if not "%%a" == "ELF" (
       echo Non-QC DTB found, packing zImage and appending . . .
       echo.
       "%bin%"\gzip --no-name -9 "%~nx1-zImage"
       copy /b "%~nx1-zImage.gz"+"%~nx1-dtb" "%~nx1-zImage" >nul
-      del *-dtb *-zImage.gz
+      del *-dtb* *-zImage.gz
     )
   )
-  del "%~nx1-dtbtest"
 )
 
 "%bin%"\file -m %rel%\magic *-ramdisk*.gz | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-ramdiskcomp"
