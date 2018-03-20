@@ -7,7 +7,7 @@ set "rel=android_win_tools"
 set "cur=%cd%"
 %~d0
 cd "%~p0"
-if "%~1" == "--help" echo usage: repackimg.bat [--original] [--level ^<0-9^>] [--avbkey ^<name^>] & goto end
+if "%~1" == "--help" echo usage: repackimg.bat [--original] [--level ^<0-9^>] [--avbkey ^<name^>] [--forceelf] & goto end
 dir /a-d split_img >nul 2>&1 || goto nofiles
 for /f "delims=" %%a in ('dir /b split_img\*-ramdiskcomp') do @set "ramdiskcname=%%a"
 for /f "delims=" %%a in ('type "split_img\%ramdiskcname%"') do @set "ramdiskcomp=%%a"
@@ -28,6 +28,9 @@ if not "[%~1]" == "[]" (
   if "%~1" == "--original" (
     set "original=1"
     echo Repacking with original ramdisk . . .
+  )
+  if "%~1" == "--forceelf" (
+    set "repackelf=1"
   )
   if "%~1" == "--level" (
     if not "[%~2]" == "[]" (
@@ -191,14 +194,19 @@ for /f "delims=" %%a in ('type "split_img\%hashname%"') do @set "hash=%%a"
 echo hash = %hash% & set "hash=--hash %hash%"
 :skiphash
 if not exist "split_img\*-dtb" goto skipdtb
+for /f "delims=" %%a in ('dir /b split_img\*-dtbtype') do @set "dtbname=%%a"
+for /f "delims=" %%a in ('type "split_img\%dtbname%"') do @set "dtbtype=%%a"
 for /f "delims=" %%a in ('dir /b split_img\*-dtb') do @set "dtb=%%a"
-echo dtb = %dtb% & set "dtb=--dt "split_img/%dtb%""
+echo dtb = %dtb% & set "rpm="split_img/%dtb%",rpm" & set "dtb=--dt "split_img/%dtb%""
 :skipdtb
 if not exist "split_img\*-unknown" goto skipunknown
 for /f "delims=" %%a in ('dir /b split_img\*-unknown') do @set "unkname=%%a"
 for /f "delims=" %%a in ('type "split_img\%unkname%"') do @set "unknown=%%a"
 echo unknown = %unknown%
 :skipunknown
+if exist "split_img\*-header" (
+  for /f "delims=" %%a in ('dir /b split_img\*-header') do @set "header=%%a"
+)
 :skipaosp
 echo.
 
@@ -222,7 +230,11 @@ if exist "split_img\*-sigtype" (
 ) else (
   set "outname=image-new.img"
 )
-if "%imgtype%" == "ELF" set "imgtype=AOSP" & echo Warning: ELF format detected; will be repacked using AOSP format! & echo.
+if "%dtbtype%" == "ELF" set "repackelf=1"
+if "%imgtype%" == "ELF" if not "[%header%]" == "[]" if defined repackelf (
+  set "buildcmd=elftool pack -o %outname% header="split_img/%header%" "%kernel%" "%ramdisk%",ramdisk %rpm% "split_img/%cmdname%"@cmdline >nul"
+)
+if "%imgtype%" == "ELF" if not defined buildcmd set "imgtype=AOSP" & echo Warning: ELF format without RPM detected; will be repacked using AOSP format! & echo.
 if "%imgtype%" == "AOSP" set "buildcmd=mkbootimg --kernel "%kernel%" --ramdisk "%ramdisk%" %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% --second_offset "%secondoff%" --tags_offset "%tagsoff%" --os_version "%osver%" --os_patch_level "%oslvl%" %hash% %dtb% -o %outname%"
 if "%imgtype%" == "AOSP-PXA" set "buildcmd=pxa-mkbootimg --kernel "%kernel%" --ramdisk "%ramdisk%" %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% --second_offset "%secondoff%" --tags_offset "%tagsoff%" --unknown "%unknown%" %dtb% -o %outname%"
 if "%imgtype%" == "KRNL" set "buildcmd=rkcrc -k "%ramdisk%" %outname%"
@@ -263,6 +275,7 @@ if "%sigtype%" == "BLOB" (
 if "%sigtype%" == "CHROMEOS" "%bin%"\futility vbutil_kernel --pack image-new.img --keyblock %rel%/chromeos/kernel.keyblock --signprivate %rel%/chromeos/kernel_data_key.vbprivk --version 1 --vmlinuz unsigned-new.img --bootloader %rel%/chromeos/empty --config %rel%/chromeos/empty --arch arm --flags 0x1
 if "%sigtype%" == "DHTB" "%bin%"\dhtbsign -i unsigned-new.img -o image-new.img >nul & del split_img\*-tailtype 2>nul
 if "%sigtype%" == "NOOK" type "split_img\*-master_boot.key" unsigned-new.img > image-new.img 2>nul
+if "%sigtype%" == "NOOKTAB" type "split_img\*-master_boot.key" unsigned-new.img > image-new.img 2>nul
 if errorlevel == 1 goto error
 
 :skipsign
