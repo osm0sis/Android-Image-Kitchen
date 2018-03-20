@@ -7,8 +7,12 @@
 0		string		-SIGNED-BY-SIGNBLOB-	BLOB signing
 
 # Barnes & Noble Nook Signature
-64		string		Green\x20Loader			NOOK signing (loader)
-64		string		Green\x20Recovery		NOOK signing (recovery)
+64		string		Red\x20Loader						NOOK signing (red loader)
+64		string		Green\x20Loader						NOOK signing (green loader)
+64		string		Green\x20Recovery					NOOK signing (green recovery)
+64		string		eMMC\x20boot.img+secondloader		NOOK signing (emmc boot)
+64		string		eMMC\x20recovery.img+secondloader	NOOK signing (emmc recovery)
+48		string		BauwksBoot							NOOKTAB signing (bauwks)
 
 # Google ChromeOS Signature
 0		string		CHROMEOS			CHROMEOS signing

@@ -3,7 +3,7 @@
 # osm0sis @ xda-developers
 
 case $1 in
-  --help) echo "usage: cleanup.sh"; exit 1;
+  --help) echo "usage: cleanup.sh [--quiet]"; exit 1;
 esac;
 
 case $(uname -s) in
@@ -21,7 +21,12 @@ cd "$aik";
 if [ -d ramdisk ] && [ "$(stat $statarg ramdisk | head -n 1)" = "root" -o ! "$(find ramdisk 2>&1 | cpio -o >/dev/null 2>&1; echo $?)" -eq "0" ]; then
   sudo=sudo;
 fi;
+
 $sudo rm -rf ramdisk split_img *new.* || exit 1;
-echo "Working directory cleaned.";
+
+case $1 in
+  --quiet) ;;
+  *) echo "Working directory cleaned.";;
+esac;
 exit 0;
 

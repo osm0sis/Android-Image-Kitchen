@@ -7,6 +7,10 @@ pxa-mkbootimg, pxa-unpackbootimg:
 https://github.com/AKuHAK/pxa-mkbootimg (initial source)
 https://github.com/osm0sis/pxa-mkbootimg (patches)
 
+elftool:
+https://bitbucket.org/srl3gx/elftool (initial source)
+https://github.com/osm0sis/elftool (patches)
+
 unpackelf:
 https://github.com/tobiaswaldvogel/and_boot_tools/tree/master/bootimg (initial source)
 https://github.com/osm0sis/unpackelf (patches)

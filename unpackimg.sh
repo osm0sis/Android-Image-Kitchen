@@ -2,7 +2,7 @@
 # AIK-Linux/unpackimg: split image and unpack ramdisk
 # osm0sis @ xda-developers
 
-cleanup() { $aik/cleanup.sh >/dev/null; }
+cleanup() { $aik/cleanup.sh --quiet; }
 abort() { cd "$aik"; echo "Error!"; }
 
 case $1 in
@@ -110,6 +110,10 @@ if [ "$(echo $imgtest | awk '{ print $2 }' | cut -d, -f1)" = "signing" ]; then
       dd bs=1048576 count=1 conv=notrunc if="$img" of="split_img/$file-master_boot.key" 2>/dev/null;
       dd bs=1048576 skip=1 conv=notrunc if="$img" of="split_img/$file" 2>/dev/null;
     ;;
+    NOOKTAB)
+      dd bs=262144 count=1 conv=notrunc if="$img" of="split_img/$file-master_boot.key" 2>/dev/null;
+      dd bs=262144 skip=1 conv=notrunc if="$img" of="split_img/$file" 2>/dev/null;
+    ;;
     SIN)
       "$bin/$arch/kernel_dump" split_img "$img" >/dev/null;
       mv -f "split_img/$file."* "split_img/$file";
@@ -175,7 +179,13 @@ cd split_img;
 case $imgtype in
   AOSP) "$bin/$arch/unpackbootimg" -i "$img";;
   AOSP-PXA) "$bin/$arch/pxa-unpackbootimg" -i "$img";;
-  ELF) "$bin/$arch/unpackelf" -i "$img";;
+  ELF)
+    mkdir elftool_out;
+    "$bin/$arch/elftool" unpack -i "$img" -o elftool_out >/dev/null;
+    mv -f elftool_out/header "$file-header" 2>/dev/null;
+    rm -rf elftool_out;
+    "$bin/$arch/unpackelf" -i "$img";
+  ;;
   KRNL) dd bs=4096 skip=8 iflag=skip_bytes conv=notrunc if="$img" of="$file-ramdisk.cpio.gz" 2>&1 | tail -n+3 | cut -d" " -f1-2;;
   U-Boot)
     "$bin/$arch/dumpimage" -l "$img";
@@ -243,6 +253,7 @@ test "$mtk" && echo $mtktype > "$file-mtktype";
 
 if [ -f *-dtb ]; then
   dtbtest="$(file -m ../$rel/androidbootimg.magic *-dtb | cut -d: -f2 | awk '{ print $1 }')";
+  echo $dtbtest > "$file-dtbtype";
   if [ "$imgtype" = "ELF" ]; then
     case $dtbtest in
       QCDT|ELF) ;;
@@ -251,7 +262,7 @@ if [ -f *-dtb ]; then
          gzip --no-name -9 "$file-zImage";
          mv -f "$file-zImage.gz" "$file-zImage";
          cat "$file-dtb" >> "$file-zImage";
-         rm -f "$file-dtb";;
+         rm -f "$file-dtb"*;;
     esac;
   fi;
 fi;
