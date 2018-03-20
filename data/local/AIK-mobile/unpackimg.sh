@@ -15,10 +15,10 @@ bin="$aik/bin";
 rel=bin;
 cur="$(readlink -f "$PWD")";
 
-cleanup() { $aik/cleanup.sh >/dev/null; }
-abort() { cd "$aik"; echo "Error!"; }
+cleanup() { $aik/cleanup.sh --quiet; }
+abort() { cd $aik; echo "Error!"; }
 
-cd "$aik";
+cd $aik;
 bb=$bin/busybox;
 chmod -R 755 $bin *.sh;
 chmod 644 $bin/magic $bin/androidbootimg.magic $bin/BootSignature_Android.jar $bin/module.prop $bin/ramdisk.img $bin/avb/* $bin/chromeos/*;
@@ -101,6 +101,10 @@ if [ "$(echo $imgtest | $bb awk '{ print $2 }' | $bb cut -d, -f1)" == "signing" 
       $bb dd bs=1048576 count=1 conv=notrunc if="$img" of="split_img/$file-master_boot.key" 2>/dev/null;
       $bb dd bs=1048576 skip=1 conv=notrunc if="$img" of="split_img/$file" 2>/dev/null;
     ;;
+    NOOKTAB)
+      $bb dd bs=262144 count=1 conv=notrunc if="$img" of="split_img/$file-master_boot.key" 2>/dev/null;
+      $bb dd bs=262144 skip=1 conv=notrunc if="$img" of="split_img/$file" 2>/dev/null;
+    ;;
     SIN)
       $bin/kernel_dump split_img "$img" >/dev/null;
       $bb mv -f "split_img/$file."* "split_img/$file";
@@ -167,7 +171,13 @@ cd split_img;
 case $imgtype in
   AOSP) $bin/unpackbootimg -i "$img";;
   AOSP-PXA) $bin/pxa-unpackbootimg -i "$img";;
-  ELF) $bin/unpackelf -i "$img";;
+  ELF)
+    mkdir elftool_out;
+    $bin/elftool unpack -i "$img" -o elftool_out >/dev/null;
+    $bb mv -f elftool_out/header "$file-header" 2>/dev/null;
+    rm -rf elftool_out;
+    $bin/unpackelf -i "$img";
+  ;;
   KRNL) $bb dd bs=4096 skip=8 iflag=skip_bytes conv=notrunc if="$img" of="$file-ramdisk.cpio.gz" 2>&1 | $bb tail -n+3 | $bb cut -d" " -f1-2;;
   U-Boot)
     $bin/dumpimage -l "$img";
@@ -232,6 +242,7 @@ test "$mtk" && echo $mtktype > "$file-mtktype";
 
 if [ -f *-dtb ]; then
   dtbtest="$($bin/file -m ../$rel/androidbootimg.magic *-dtb | $bb cut -d: -f2 | $bb awk '{ print $1 }')";
+  echo $dtbtest > "$file-dtbtype";
   if [ "$imgtype" == "ELF" ]; then
     case $dtbtest in
       QCDT|ELF) ;;
@@ -239,7 +250,7 @@ if [ -f *-dtb ]; then
          $bb gzip "$file-zImage";
          $bb mv -f "$file-zImage.gz" "$file-zImage";
          cat "$file-dtb" >> "$file-zImage";
-         rm -f "$file-dtb";;
+         rm -f "$file-dtb"*;;
     esac;
   fi;
 fi;
@@ -280,7 +291,7 @@ else
     abort;
     return 1;
   fi;
-  $unpackcmd "../split_img/$file-ramdisk.cpio$compext" | $bb cpio -i -d 2>&1;
+  $unpackcmd "../split_img/$file-ramdisk.cpio$compext" | EXTRACT_UNSAFE_SYMLINKS=1 $bb cpio -i -d 2>&1;
   if [ $? != "0" ]; then
     abort;
     return 1;

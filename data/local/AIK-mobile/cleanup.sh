@@ -3,7 +3,7 @@
 # osm0sis @ xda-developers
 
 case $1 in
-  --help) echo "usage: cleanup.sh"; return 1;
+  --help) echo "usage: cleanup.sh [--quiet]"; return 1;
 esac;
 
 case $0 in
@@ -28,6 +28,9 @@ $bb losetup -d $loop 2>/dev/null;
 
 rm -rf ramdisk split_img *new.* || return 1;
 
-echo "Working directory cleaned.";
+case $1 in
+  --quiet) ;;
+  *) echo "Working directory cleaned.";;
+esac;
 return 0;
 

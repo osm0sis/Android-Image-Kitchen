@@ -3,7 +3,7 @@
 # osm0sis @ xda-developers
 
 case $1 in
-  --help) echo "usage: repackimg.sh [--original] [--level <0-9>] [--avbkey <name>]"; return 1;
+  --help) echo "usage: repackimg.sh [--original] [--level <0-9>] [--avbkey <name>] [--forceelf]"; return 1;
 esac;
 
 case $0 in
@@ -69,6 +69,7 @@ rm -f *-new.*;
 while [ "$1" ]; do
   case $1 in
     --original) original=1;;
+    --forceelf) repackelf=1;;
     --level)
       case $2 in
         ''|*[!0-9]*) ;;
@@ -147,6 +148,8 @@ else
     second=(--second "split_img/$second");
   fi;
   if [ -f *-cmdline ]; then
+    cmdname=`ls *-cmdline`;
+    cmdname="split_img/$cmdname";
     cmdline=`cat *-cmdline`;          echo "cmdline = $cmdline";
   fi;
   if [ -f *-board ]; then
@@ -173,11 +176,17 @@ else
     hash="--hash $hash";
   fi;
   if [ -f *-dtb ]; then
+    dtbtype=`cat *-dtbtype`;
     dtb=`ls *-dtb`;                   echo "dtb = $dtb";
+    rpm=("split_img/$dtb",rpm);
     dtb=(--dt "split_img/$dtb");
   fi;
   if [ -f *-unknown ]; then
     unknown=`cat *-unknown`;          echo "unknown = $unknown";
+  fi;
+  if [ -f *-header ]; then
+    header=`ls *-header`;
+    header="split_img/$header";
   fi;
 fi;
 cd ..;
@@ -203,9 +212,10 @@ else
   outname=image-new.img;
 fi;
 
-if [ "$imgtype" == "ELF" ]; then
+test "$dtbtype" == "ELF" && repackelf=1;
+if [ "$imgtype" == "ELF" ] && [ ! "$header" -o ! "$repackelf" ]; then
   imgtype=AOSP;
-  echo "\nWarning: ELF format detected; will be repacked using AOSP format!";
+  echo "\nWarning: ELF format without RPM detected; will be repacked using AOSP format!";
 fi;
 
 echo "\nBuilding image...\n";
@@ -213,6 +223,7 @@ echo "Using format: $imgtype\n";
 case $imgtype in
   AOSP) $bin/mkbootimg --kernel "$kernel" --ramdisk "$ramdisk" "${second[@]}" --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --os_version "$osver" --os_patch_level "$oslvl" $hash "${dtb[@]}" -o $outname;;
   AOSP-PXA) $bin/pxa-mkbootimg --kernel "$kernel" --ramdisk "$ramdisk" "${second[@]}" --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --unknown $unknown "${dtb[@]}" -o $outname;;
+  ELF) $bin/elftool pack -o $outname header="$header" "$kernel" "$ramdisk",ramdisk "${rpm[@]}" "$cmdname"@cmdline >/dev/null;;
   KRNL) $bin/rkcrc -k "$ramdisk" $outname;;
   U-Boot)
     test "$type" == "Multi" && uramdisk=(:"$ramdisk");
@@ -249,7 +260,7 @@ if [ -f split_img/*-sigtype ]; then
       $bin/dhtbsign -i unsigned-new.img -o image-new.img >/dev/null;
       rm -rf split_img/*-tailtype 2>/dev/null;
     ;;
-    NOOK) cat split_img/*-master_boot.key unsigned-new.img > image-new.img;;
+    NOOK*) cat split_img/*-master_boot.key unsigned-new.img > image-new.img;;
   esac;
   if [ $? != "0" ]; then
     abort;
