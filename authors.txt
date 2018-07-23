@@ -16,7 +16,7 @@ https://github.com/tobiaswaldvogel/and_boot_tools/tree/master/bootimg (initial s
 https://github.com/osm0sis/unpackelf (patches)
 
 dumpimage, mkimage:
-http://www.denx.de/wiki/U-Boot/WebHome
+https://www.denx.de/wiki/U-Boot/WebHome
 
 mkmtkhdr:
 https://github.com/omnirom/android_device_oppo_r819/tree/android-4.4/mkmtkbootimg (initial source)
@@ -50,13 +50,13 @@ cygbz2-1, cygcrypto-1.0.0, cyggcc_s-1, cygiconv-2, cygintl-8, cyglzma-5, cyglzo2
 https://cygwin.com/
 
 lz4:
-http://lz4.github.io/lz4/
+https://lz4.github.io/lz4/
 
 sudo:
 https://github.com/mattn/sudo
 
 magic:
-http://www.darwinsys.com/file/
+https://www.darwinsys.com/file/
 
 androidbootimg.magic:
 osm0sis@xda-developers
