@@ -152,7 +152,7 @@ if [ "$(echo $trim | $bb awk '{ print $(NF-3) $(NF-2) $(NF-1) }')" == "000000000
 else
   offset=$(echo $trim | $bb awk '{ print $NF }');
 fi;
-tailtest="$($bb dd if="$img" iflag=skip_bytes skip=$((offset-4096)) bs=4096 count=1 2>/dev/null | $bin/file -m $rel/androidbootimg.magic - | $bb cut -d: -f2-)";
+tailtest="$($bb dd if="$img" iflag=skip_bytes skip=$((offset-8192)) bs=8192 count=1 2>/dev/null | $bin/file -m $rel/androidbootimg.magic - | $bb cut -d: -f2-)";
 tailtype="$(echo $tailtest | $bb awk '{ print $1 }')";
 case $tailtype in
   AVB)

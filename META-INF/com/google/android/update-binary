@@ -93,6 +93,11 @@ case $abi in
   *) ui_print "Unknown architecture: $abi"; abort;;
 esac;
 ui_print "Using architecture: $arch";
+cd bin;
+# work around old Magisk Manager PATH issue leading to toybox's limited tar being used
+bb=$(which busybox 2>/dev/null);
+$bb tar -xJf $arch.tar.xz;
+cd ..;
 rm -r /data/local/AIK-mobile;
 cp -rf data/* /data;
 cp -rf bin/$arch/* /data/local/AIK-mobile/bin/;
@@ -104,7 +109,7 @@ set_progress 0.8;
 
 # Magisk clean flash support
 if [ -e /data/$adb/magisk -a ! -e /data/$adb/magisk.img ]; then
-  /system/bin/make_ext4fs -l 64M /data/$adb/magisk.img;
+  /system/bin/make_ext4fs -b 4096 -l 64M /data/$adb/magisk.img || /system/bin/mke2fs -b 4096 -t ext4 /data/$adb/magisk.img 64M;
 fi;
 
 ui_print " ";
@@ -145,16 +150,18 @@ if [ "$magisk" ]; then
   touch "$mnt/$modname/auto_mount";
   chcon -hR 'u:object_r:system_file:s0' "$mnt/$modname";
   if $BOOTMODE && [ "$suimg" == "/data/$adb/magisk_merge.img" ]; then
-    mkdir -p "/magisk/$modname";
-    touch "/magisk/$modname/update";
-    cp -f module.prop "/magisk/$modname/";
+    test -e /magisk && imgmnt=/magisk || imgmnt=/sbin/.core/img;
+    mkdir -p "$imgmnt/$modname";
+    touch "$imgmnt/$modname/update";
+    cp -f module.prop "$imgmnt/$modname/";
   fi;
 fi;
 set_progress 1.0;
 
 ui_print " ";
 ui_print "Unmounting...";
-umount $mnt;
+test "$suimg" && umount $mnt;
+test "$loop" && losetup -d $loop;
 umount /system;
 umount /data;
 umount /cache;

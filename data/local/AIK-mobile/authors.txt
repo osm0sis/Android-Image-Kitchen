@@ -16,7 +16,7 @@ https://github.com/tobiaswaldvogel/and_boot_tools/tree/master/bootimg (initial s
 https://github.com/osm0sis/unpackelf (patches)
 
 dumpimage, mkimage:
-http://www.denx.de/wiki/U-Boot/WebHome
+https://www.denx.de/wiki/U-Boot/WebHome
 
 mkmtkhdr:
 https://github.com/omnirom/android_device_oppo_r819/tree/android-4.4/mkmtkbootimg (initial source)
@@ -46,17 +46,17 @@ kernel_dump:
 https://forum.xda-developers.com/crossdevice-dev/sony/tool-unpack-format-sony-kernel-image-t3530077
 
 busybox:
-http://busybox.net/ (initial source)
+https://busybox.net/ (initial source)
 https://github.com/osm0sis/android-busybox-ndk (patches)
 
 file, magic:
-http://www.darwinsys.com/file/
+https://www.darwinsys.com/file/
 
 xz:
-http://tukaani.org/xz/
+https://tukaani.org/xz/
 
 lz4:
-http://lz4.github.io/lz4/
+https://lz4.github.io/lz4/
 
 androidbootimg.magic:
 osm0sis@xda-developers
