@@ -153,8 +153,8 @@ else
   fi;
   if [ -f *-cmdline ]; then
     cmdname=`ls *-cmdline`;
-    cmdname="split_img/$cmdname";
     cmdline=`cat *-cmdline`;          echo "cmdline = $cmdline";
+    cmd=("split_img/$cmdname"@cmdline);
   fi;
   if [ -f *-board ]; then
     board=`cat *-board`;              echo "board = $board";
@@ -233,7 +233,7 @@ echo " ";
 case $imgtype in
   AOSP) "$bin/$arch/mkbootimg" --kernel "$kernel" --ramdisk "$ramdisk" "${second[@]}" --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --os_version "$osver" --os_patch_level "$oslvl" $hash "${dtb[@]}" -o $outname;;
   AOSP-PXA) "$bin/$arch/pxa-mkbootimg" --kernel "$kernel" --ramdisk "$ramdisk" "${second[@]}" --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --unknown $unknown "${dtb[@]}" -o $outname;;
-  ELF) "$bin/$arch/elftool" pack -o $outname header="$header" "$kernel" "$ramdisk",ramdisk "${rpm[@]}" "$cmdname"@cmdline >/dev/null;;
+  ELF) "$bin/$arch/elftool" pack -o $outname header="$header" "$kernel" "$ramdisk",ramdisk "${rpm[@]}" "${cmd[@]}" >/dev/null;;
   KRNL) "$bin/$arch/rkcrc" -k "$ramdisk" $outname;;
   U-Boot)
     test "$type" == "Multi" && uramdisk=(:"$ramdisk");

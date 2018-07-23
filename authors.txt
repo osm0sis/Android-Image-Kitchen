@@ -16,7 +16,7 @@ https://github.com/tobiaswaldvogel/and_boot_tools/tree/master/bootimg (initial s
 https://github.com/osm0sis/unpackelf (patches)
 
 dumpimage, mkimage:
-http://www.denx.de/wiki/U-Boot/WebHome
+https://www.denx.de/wiki/U-Boot/WebHome
 
 mkmtkhdr:
 https://github.com/omnirom/android_device_oppo_r819/tree/android-4.4/mkmtkbootimg (initial source)
@@ -46,10 +46,10 @@ kernel_dump:
 https://forum.xda-developers.com/crossdevice-dev/sony/tool-unpack-format-sony-kernel-image-t3530077
 
 lz4:
-http://lz4.github.io/lz4/
+https://lz4.github.io/lz4/
 
 magic:
-http://www.darwinsys.com/file/
+https://www.darwinsys.com/file/
 
 cpio, dd, file, lzop, tail, xz; libiconv.2, libintl.8, liblzma.5, liblzo2.2, libmagic.1 (macOS):
 https://www.macports.org/
