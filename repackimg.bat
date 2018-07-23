@@ -147,6 +147,7 @@ echo second = %second% & set "second=--second "split_img/%second%""
 if not exist "split_img\*-cmdline" goto skipcmd
 for /f "delims=" %%a in ('dir /b split_img\*-cmdline') do @set "cmdname=%%a"
 for /f "delims=" %%a in ('type "split_img\%cmdname%"') do @set "cmdline=%%a"
+set "cmd="split_img/%cmdname%"@cmdline"
 :skipcmd
 echo cmdline = %cmdline%
 if defined cmdline set "cmdline=%cmdline:"=\"%"
@@ -232,7 +233,7 @@ if exist "split_img\*-sigtype" (
 )
 if "%dtbtype%" == "ELF" set "repackelf=1"
 if "%imgtype%" == "ELF" if not "[%header%]" == "[]" if defined repackelf (
-  set "buildcmd=elftool pack -o %outname% header="split_img/%header%" "%kernel%" "%ramdisk%",ramdisk %rpm% "split_img/%cmdname%"@cmdline >nul"
+  set "buildcmd=elftool pack -o %outname% header="split_img/%header%" "%kernel%" "%ramdisk%",ramdisk %rpm% %cmd% >nul"
 )
 if "%imgtype%" == "ELF" if not defined buildcmd set "imgtype=AOSP" & echo Warning: ELF format without RPM detected; will be repacked using AOSP format! & echo.
 if "%imgtype%" == "AOSP" set "buildcmd=mkbootimg --kernel "%kernel%" --ramdisk "%ramdisk%" %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% --second_offset "%secondoff%" --tags_offset "%tagsoff%" --os_version "%osver%" --os_patch_level "%oslvl%" %hash% %dtb% -o %outname%"
