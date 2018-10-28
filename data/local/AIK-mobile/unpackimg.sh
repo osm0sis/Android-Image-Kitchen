@@ -66,21 +66,18 @@ chmod 666 ramdisk/README;
 cp -fp $bin/remount.sh ramdisk/remount.sh;
 cp -f $bin/ramdisk.img split_img/.aik-ramdisk.img;
 
-case `$bb mount` in
-  *" $aik/ramdisk "*) ;;
-  *)
-    $su -c "$bb mount -t ext4 -o rw,noatime $aik/split_img/.aik-ramdisk.img $aik/ramdisk" 2>/dev/null;
-    if [ $? != "0" ]; then
-      for i in 0 1 2 3 4 5 6 7; do
-        loop=/dev/block/loop$i;
-        $bb mknod $loop b 7 $i 2>/dev/null;
-        $bb losetup $loop $aik/split_img/.aik-ramdisk.img 2>/dev/null;
-        test "$($bb losetup $loop | $bb grep $aik)" && break;
-      done;
-      $su -c "$bb mount -t ext4 -o loop,noatime $loop $aik/ramdisk" || return 1;
-    fi;
-  ;;
-esac;
+if [ ! "$($bb mount | $bb grep " $aik/ramdisk ")" ]; then
+  $su -c "$bb mount -t ext4 -o rw,noatime $aik/split_img/.aik-ramdisk.img $aik/ramdisk" 2>/dev/null;
+  if [ $? != "0" ]; then
+    for i in 0 1 2 3 4 5 6 7; do
+      loop=/dev/block/loop$i;
+      $bb mknod $loop b 7 $i 2>/dev/null;
+      $bb losetup $loop $aik/split_img/.aik-ramdisk.img 2>/dev/null;
+      test "$($bb losetup $loop | $bb grep $aik)" && break;
+    done;
+    $su -c "$bb mount -t ext4 -o loop,noatime $loop $aik/ramdisk" || return 1;
+  fi;
+fi;
 
 imgtest="$($bin/file -m $rel/androidbootimg.magic "$img" | $bb cut -d: -f2-)";
 if [ "$(echo $imgtest | $bb awk '{ print $2 }' | $bb cut -d, -f1)" == "signing" ]; then

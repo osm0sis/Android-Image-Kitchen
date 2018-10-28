@@ -34,21 +34,18 @@ if [ -z "$(ls split_img/* 2>/dev/null)" -o ! -e ramdisk ]; then
   return 1;
 fi;
 
-case `$bb mount` in
-  *" $aik/ramdisk "*) ;;
-  *)
-    $su -c "$bb mount -t ext4 -o rw,noatime $aik/split_img/.aik-ramdisk.img $aik/ramdisk" 2>/dev/null;
-    if [ $? != "0" ]; then
-      for i in 0 1 2 3 4 5 6 7; do
-        loop=/dev/block/loop$i;
-        $bb mknod $loop b 7 $i 2>/dev/null;
-        $bb losetup $loop $aik/split_img/.aik-ramdisk.img 2>/dev/null;
-        test "$($bb losetup $loop | $bb grep $aik)" && break;
-      done;
-      $su -c "$bb mount -t ext4 -o loop,noatime $loop $aik/ramdisk" || return 1;
-    fi;
-  ;;
-esac;
+if [ ! "$($bb mount | $bb grep " $aik/ramdisk ")" ]; then
+  $su -c "$bb mount -t ext4 -o rw,noatime $aik/split_img/.aik-ramdisk.img $aik/ramdisk" 2>/dev/null;
+  if [ $? != "0" ]; then
+    for i in 0 1 2 3 4 5 6 7; do
+      loop=/dev/block/loop$i;
+      $bb mknod $loop b 7 $i 2>/dev/null;
+      $bb losetup $loop $aik/split_img/.aik-ramdisk.img 2>/dev/null;
+      test "$($bb losetup $loop | $bb grep $aik)" && break;
+    done;
+    $su -c "$bb mount -t ext4 -o loop,noatime $loop $aik/ramdisk" || return 1;
+  fi;
+fi;
 
 ramdiskcomp=`cat split_img/*-ramdiskcomp`;
 if [ -z "$(ls ramdisk/* 2>/dev/null)" -a ! "$ramdiskcomp" == "empty" ]; then
@@ -147,6 +144,10 @@ else
     second=`ls *-second`;             echo "second = $second";
     second=(--second "split_img/$second");
   fi;
+  if [ -f *-recoverydtbo ]; then
+    recoverydtbo=`ls *-recoverydtbo`; echo "recovery_dtbo = $recoverydtbo";
+    recoverydtbo=(--recovery_dtbo "split_img/$recoverydtbo");
+  fi;
   if [ -f *-cmdline ]; then
     cmdname=`ls *-cmdline`;
     cmdline=`cat *-cmdline`;          echo "cmdline = $cmdline";
@@ -170,6 +171,9 @@ else
   fi;
   if [ -f *-oslevel ]; then
     oslvl=`cat *-oslevel`;            echo "os_patch_level = $oslvl";
+  fi;
+  if [ -f *-headerversion ]; then
+    hdrver=`cat *-headerversion`;     echo "header_version = $hdrver";
   fi;
   if [ -f *-hash ]; then
     hash=`cat *-hash`;                echo "hash = $hash";
@@ -221,7 +225,7 @@ fi;
 echo "\nBuilding image...\n";
 echo "Using format: $imgtype\n";
 case $imgtype in
-  AOSP) $bin/mkbootimg --kernel "$kernel" --ramdisk "$ramdisk" "${second[@]}" --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --os_version "$osver" --os_patch_level "$oslvl" $hash "${dtb[@]}" -o $outname;;
+  AOSP) $bin/mkbootimg --kernel "$kernel" --ramdisk "$ramdisk" "${second[@]}" "${recoverydtbo[@]}" --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --os_version "$osver" --os_patch_level "$oslvl" --header_version "$hdrver" $hash "${dtb[@]}" -o $outname;;
   AOSP-PXA) $bin/pxa-mkbootimg --kernel "$kernel" --ramdisk "$ramdisk" "${second[@]}" --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --unknown $unknown "${dtb[@]}" -o $outname;;
   ELF) $bin/elftool pack -o $outname header="$header" "$kernel" "$ramdisk",ramdisk "${rpm[@]}" "${cmd[@]}" >/dev/null;;
   KRNL) $bin/rkcrc -k "$ramdisk" $outname;;
