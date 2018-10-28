@@ -151,6 +151,10 @@ else
     second=`ls *-second`;             echo "second = $second";
     second=(--second "split_img/$second");
   fi;
+  if [ -f *-recoverydtbo ]; then
+    recoverydtbo=`ls *-recoverydtbo`; echo "recovery_dtbo = $recoverydtbo";
+    recoverydtbo=(--recovery_dtbo "split_img/$recoverydtbo");
+  fi;
   if [ -f *-cmdline ]; then
     cmdname=`ls *-cmdline`;
     cmdline=`cat *-cmdline`;          echo "cmdline = $cmdline";
@@ -174,6 +178,9 @@ else
   fi;
   if [ -f *-oslevel ]; then
     oslvl=`cat *-oslevel`;            echo "os_patch_level = $oslvl";
+  fi;
+  if [ -f *-headerversion ]; then
+    hdrver=`cat *-headerversion`;     echo "header_version = $hdrver";
   fi;
   if [ -f *-hash ]; then
     hash=`cat *-hash`;                echo "hash = $hash";
@@ -231,7 +238,7 @@ echo " ";
 echo "Using format: $imgtype";
 echo " ";
 case $imgtype in
-  AOSP) "$bin/$arch/mkbootimg" --kernel "$kernel" --ramdisk "$ramdisk" "${second[@]}" --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --os_version "$osver" --os_patch_level "$oslvl" $hash "${dtb[@]}" -o $outname;;
+  AOSP) "$bin/$arch/mkbootimg" --kernel "$kernel" --ramdisk "$ramdisk" "${second[@]}" "${recoverydtbo[@]}" --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --os_version "$osver" --os_patch_level "$oslvl" --header_version "$hdrver" $hash "${dtb[@]}" -o $outname;;
   AOSP-PXA) "$bin/$arch/pxa-mkbootimg" --kernel "$kernel" --ramdisk "$ramdisk" "${second[@]}" --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --unknown $unknown "${dtb[@]}" -o $outname;;
   ELF) "$bin/$arch/elftool" pack -o $outname header="$header" "$kernel" "$ramdisk",ramdisk "${rpm[@]}" "${cmd[@]}" >/dev/null;;
   KRNL) "$bin/$arch/rkcrc" -k "$ramdisk" $outname;;
