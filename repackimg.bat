@@ -144,6 +144,10 @@ if not exist "split_img\*-second" goto skipsecond
 for /f "delims=" %%a in ('dir /b split_img\*-second') do @set "second=%%a"
 echo second = %second% & set "second=--second "split_img/%second%""
 :skipsecond
+if not exist "split_img\*-recoverydtbo" goto skiprecdtbo
+for /f "delims=" %%a in ('dir /b split_img\*-recoverydtbo') do @set "recoverydtbo=%%a"
+echo recovery_dtbo = %recoverydtbo% & set "recoverydtbo=--recovery_dtbo "split_img/%recoverydtbo%""
+:skiprecdtbo
 if not exist "split_img\*-cmdline" goto skipcmd
 for /f "delims=" %%a in ('dir /b split_img\*-cmdline') do @set "cmdname=%%a"
 for /f "delims=" %%a in ('type "split_img\%cmdname%"') do @set "cmdline=%%a"
@@ -189,6 +193,11 @@ for /f "delims=" %%a in ('dir /b split_img\*-oslevel') do @set "oslname=%%a"
 for /f "delims=" %%a in ('type "split_img\%oslname%"') do @set "oslvl=%%a"
 echo os_patch_level = %oslvl%
 :skiposlvl
+if not exist "split_img\*-headerversion" goto skiphdrver
+for /f "delims=" %%a in ('dir /b split_img\*-headerversion') do @set "hdrvname=%%a"
+for /f "delims=" %%a in ('type "split_img\%hdrvname%"') do @set "hdrver=%%a"
+echo header_version = %hdrver%
+:skiphdrver
 if not exist "split_img\*-hash" goto skiphash
 for /f "delims=" %%a in ('dir /b split_img\*-hash') do @set "hashname=%%a"
 for /f "delims=" %%a in ('type "split_img\%hashname%"') do @set "hash=%%a"
@@ -236,7 +245,7 @@ if "%imgtype%" == "ELF" if not "[%header%]" == "[]" if defined repackelf (
   set "buildcmd=elftool pack -o %outname% header="split_img/%header%" "%kernel%" "%ramdisk%",ramdisk %rpm% %cmd% >nul"
 )
 if "%imgtype%" == "ELF" if not defined buildcmd set "imgtype=AOSP" & echo Warning: ELF format without RPM detected; will be repacked using AOSP format! & echo.
-if "%imgtype%" == "AOSP" set "buildcmd=mkbootimg --kernel "%kernel%" --ramdisk "%ramdisk%" %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% --second_offset "%secondoff%" --tags_offset "%tagsoff%" --os_version "%osver%" --os_patch_level "%oslvl%" %hash% %dtb% -o %outname%"
+if "%imgtype%" == "AOSP" set "buildcmd=mkbootimg --kernel "%kernel%" --ramdisk "%ramdisk%" %second% %recoverydtbo% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% --second_offset "%secondoff%" --tags_offset "%tagsoff%" --os_version "%osver%" --os_patch_level "%oslvl%" --header_version "%hdrver%" %hash% %dtb% -o %outname%"
 if "%imgtype%" == "AOSP-PXA" set "buildcmd=pxa-mkbootimg --kernel "%kernel%" --ramdisk "%ramdisk%" %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% --second_offset "%secondoff%" --tags_offset "%tagsoff%" --unknown "%unknown%" %dtb% -o %outname%"
 if "%imgtype%" == "KRNL" set "buildcmd=rkcrc -k "%ramdisk%" %outname%"
 if "%imgtype%" == "U-Boot" if "%type%" == "Multi" set "uramdisk=:%ramdisk%"
