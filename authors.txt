@@ -15,6 +15,9 @@ unpackelf:
 https://github.com/tobiaswaldvogel/and_boot_tools/tree/master/bootimg (initial source)
 https://github.com/osm0sis/unpackelf (patches)
 
+mboot:
+https://github.com/osm0sis/mboot
+
 dumpimage, mkimage:
 https://www.denx.de/wiki/U-Boot/WebHome
 
@@ -29,7 +32,7 @@ futility:
 https://github.com/jcadduono/platform_external_vboot_reference (initial source)
 https://github.com/osm0sis/futility (patches)
 
-BootSignature.jar (requires JRE 8):
+BootSignature.jar (requires JRE 8+):
 https://forum.xda-developers.com/android/software-hacking/signing-boot-images-android-verified-t3600606
 
 blobpack, blobunpack:
@@ -51,10 +54,12 @@ https://lz4.github.io/lz4/
 magic:
 https://www.darwinsys.com/file/
 
-cpio, dd, file, lzop, tail, xz; libiconv.2, libintl.8, liblzma.5, liblzo2.2, libmagic.1 (macOS):
+cpio, dd, file, lzop, tail, xz;
+libiconv.2, libintl.8, liblzma.5, liblzo2.2, libmagic.1 (macOS):
 https://www.macports.org/
 
-gzip, bzip2, lzop, xz; awk, basename, bash, cpio, cut, dd, dirname, env, file, find, grep, printf, stat, sudo, tail, wc (Linux):
+gzip, bzip2, lzop, xz;
+awk, basename, bash, cpio, cut, dd, dirname, env, file, find, grep, hexdump, printf, sed, stat, sudo, tail, wc (Linux):
 (required system packages/commands)
 
 androidbootimg.magic:

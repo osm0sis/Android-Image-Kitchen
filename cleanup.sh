@@ -3,7 +3,7 @@
 # osm0sis @ xda-developers
 
 case $1 in
-  --help) echo "usage: cleanup.sh [--quiet]"; exit 1;
+  --help) echo "usage: cleanup.sh [--local] [--quiet]"; exit 1;
 esac;
 
 case $(uname -s) in
@@ -16,8 +16,16 @@ esac;
 
 aik="${BASH_SOURCE:-$0}";
 aik="$(dirname "$(readlink -f "$aik")")";
+bin="$aik/bin";
 
-cd "$aik";
+case $1 in
+  --local) shift;;
+  *) cd "$aik";;
+esac;
+
+chmod -R 755 "$bin" "$aik"/*.sh;
+chmod 644 "$bin/magic" "$bin/androidbootimg.magic" "$bin/BootSignature.jar" "$bin/avb/"* "$bin/chromeos/"*;
+
 if [ -d ramdisk ] && [ "$(stat $statarg ramdisk | head -n 1)" = "root" -o ! "$(find ramdisk 2>&1 | cpio -o >/dev/null 2>&1; echo $?)" -eq "0" ]; then
   sudo=sudo;
 fi;
