@@ -40,8 +40,13 @@
 # DENX U-Boot
 0		string		\x27\x05\x19\x56	U-Boot bootimg
 
-# Intel OS
-0		string		$OS$\x00\x00\x01	OS bootimg
+# Intel OSIP
+1000	search		\xFC\xFA\xBC\x00	OSIP bootimg (headerless)
+0		string		$OS$\x00\x00\x01	OSIP bootimg
+>52		string		\x00\x00\x00\x00	\b, boot (signed)
+>52		string		\x01\x00\x00\x00	\b, boot (unsigned)
+>52		string		\x0C\x00\x00\x00	\b, recovery (signed)
+>52		string		\x0D\x00\x00\x00	\b, recovery (unsigned)
 
 # Rockchip KRNL
 0		string		KRNL				KRNL bootimg
