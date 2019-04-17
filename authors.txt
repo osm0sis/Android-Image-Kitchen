@@ -15,6 +15,9 @@ unpackelf:
 https://github.com/tobiaswaldvogel/and_boot_tools/tree/master/bootimg (initial source)
 https://github.com/osm0sis/unpackelf (patches)
 
+mboot:
+https://github.com/osm0sis/mboot
+
 dumpimage, mkimage:
 https://www.denx.de/wiki/U-Boot/WebHome
 
@@ -29,7 +32,7 @@ futility:
 https://github.com/jcadduono/platform_external_vboot_reference (initial source)
 https://github.com/osm0sis/futility (patches)
 
-BootSignature.jar (requires JRE 8):
+BootSignature.jar (requires JRE 8+):
 https://forum.xda-developers.com/android/software-hacking/signing-boot-images-android-verified-t3600606
 
 blobpack, blobunpack:
@@ -45,8 +48,8 @@ https://github.com/rockchip-linux/rkflashtool
 kernel_dump:
 https://forum.xda-developers.com/crossdevice-dev/sony/tool-unpack-format-sony-kernel-image-t3530077
 
-bzip2, chmod, cpio, cut, dd, file, find, gzip, lzop, printf, tail, xz;
-cygbz2-1, cygcrypto-1.0.0, cyggcc_s-1, cygiconv-2, cygintl-8, cyglzma-5, cyglzo2-2, cygmagic-1, cygssl-1.0.0, cygwin1, cygz:
+bzip2, cat, chmod, cpio, cut, dd, file, find, gzip, hexdump, lzop, printf, tail, xz;
+cygbz2-1, cygcrypto-1.1, cyggcc_s-1, cygiconv-2, cygintl-8, cyglzma-5, cyglzo2-2, cygmagic-1, cygncursesw-10.dll, cygssl-1.1, cygwin1, cygz:
 https://cygwin.com/
 
 lz4:

@@ -4,11 +4,16 @@ set CYGWIN=nodosfilewarning
 
 set "aik=%~dp0"
 set "bin=%~dp0\android_win_tools"
-set "rel=..\android_win_tools"
 set "cur=%cd%"
-%~d0
-cd "%~p0"
-if "%~1" == "--help" echo usage: unpackimg.bat ^<file^> & goto end
+
+if "%~1" == "--help" echo usage: unpackimg.bat [--local] ^<file^> & goto end
+if "%~1" == "--local" (
+  set "local=--local"
+  shift
+) else (
+  %~d0
+  cd "%~p0"
+)
 if "[%~1]" == "[]" (
   for /f "delims=" %%a in ('dir /b /o *.elf *.img *.sin 2^>nul') do (
     if not "%%a" == "aboot.img" if not "%%a" == "image-new.img" if not "%%a" == "unlokied-new.img" if not "%%a" == "unsigned-new.img" (
@@ -42,21 +47,24 @@ if exist ramdisk\nul set "noclean=1"
 if defined noclean (
   echo Removing old work folders and files . . .
   echo.
-  call cleanup.bat >nul
+  call "%aik%\cleanup.bat" %local% >nul
 )
 
 echo Setting up work folders . . .
 echo.
 md split_img
-if errorlevel == 1 call "%aik%\cleanup.bat" >nul & goto error
+if errorlevel == 1 call "%aik%\cleanup.bat" %local% >nul & goto error
 md ramdisk
-if errorlevel == 1 call "%aik%\cleanup.bat" >nul & goto error
+if errorlevel == 1 call "%aik%\cleanup.bat" %local% >nul & goto error
+icacls ramdisk /inheritance:d >nul 2>&1
+icacls ramdisk /remove:g "NT AUTHORITY\Authenticated Users" >nul 2>&1
+icacls ramdisk /remove:g "BUILTIN\Users" >nul 2>&1
 
 cd split_img
-"%bin%"\file -m %rel%\androidbootimg.magic "%file%" | "%bin%"\cut -d: -f2- | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f3 | "%bin%"\cut -d, -f1 > "%~nx1-imgtype"
+"%bin%"\file -m "%bin%\androidbootimg.magic" "%file%" 2>nul | "%bin%"\cut -d: -f2- | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f3 | "%bin%"\cut -d, -f1 > "%~nx1-imgtype"
 for /f "delims=" %%a in ('type "%~nx1-imgtype"') do @set "imgtest=%%a"
 if "%imgtest%" == "signing" (
-  "%bin%"\file -m %rel%\androidbootimg.magic "%file%" | "%bin%"\cut -d: -f2- | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-sigtype"
+  "%bin%"\file -m "%bin%\androidbootimg.magic" "%file%" 2>nul | "%bin%"\cut -d: -f2- | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-sigtype"
   for /f "delims=" %%a in ('type "%~nx1-sigtype"') do @set "sigtype=%%a" & echo Signature with "%%a" type detected, removing . . .
   echo.
 )
@@ -86,18 +94,19 @@ if "%sigtype%" == "SIN" (
   del "%~nx1-sigtype"
 )
 
-"%bin%"\file -m %rel%\androidbootimg.magic "%file%" | "%bin%"\cut -d: -f2- | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f3 | "%bin%"\cut -d, -f1 > "%~nx1-imgtype"
+"%bin%"\file -m "%bin%\androidbootimg.magic" "%file%" 2>nul | "%bin%"\cut -d: -f2- | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f3 | "%bin%"\cut -d, -f1 > "%~nx1-imgtype"
 for /f "delims=" %%a in ('type "%~nx1-imgtype"') do @set "imgtest=%%a"
 if "%imgtest%" == "bootimg" (
   set "imgtest="
-  "%bin%"\file -m %rel%\androidbootimg.magic "%file%" | "%bin%"\cut -d: -f2- | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f4 > "%~nx1-imgtype"
+  "%bin%"\file -m "%bin%\androidbootimg.magic" "%file%" 2>nul | "%bin%"\cut -d: -f2- | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f4 > "%~nx1-imgtype"
   for /f "delims=" %%a in ('type "%~nx1-imgtype"') do (
     if "%%a" == "PXA" set "imgtest=-%%a"
   )
-  "%bin%"\file -m %rel%\androidbootimg.magic "%file%" | "%bin%"\cut -d: -f2- | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-imgtype"
+  "%bin%"\file -m "%bin%\androidbootimg.magic" "%file%" 2>nul | "%bin%"\cut -d: -f2- | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-imgtype"
   for /f "delims=" %%a in ('type "%~nx1-imgtype"') do @set "imgtype=%%a"
 ) else (
-  call "%aik%\cleanup.bat" >nul
+  cd ..
+  call "%aik%\cleanup.bat" %local% >nul
   echo Unrecognized format.
   goto error
 )
@@ -110,13 +119,19 @@ if "%imgtype%" == "AOSP" set "supported=1"
 if "%imgtype%" == "AOSP-PXA" set "supported=1"
 if "%imgtype%" == "ELF" set "supported=1"
 if "%imgtype%" == "KRNL" set "supported=1"
+if "%imgtype%" == "OSIP" set "supported=1"
 if "%imgtype%" == "U-Boot" set "supported=1"
-if not defined supported call "%aik%\cleanup.bat" >nul & echo Unsupported format. & goto error
+if not defined supported (
+  cd ..
+  call "%aik%\cleanup.bat" %local% >nul
+  echo Unsupported format.
+  goto error
+)
 
-"%bin%"\file -m %rel%\androidbootimg.magic "%file%" | "%bin%"\cut -d: -f2- | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f4 > "%~nx1-lokitype"
+"%bin%"\file -m "%bin%\androidbootimg.magic" "%file%" 2>nul | "%bin%"\cut -d: -f2- | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f4 > "%~nx1-lokitype"
 for /f "delims=" %%a in ('type "%~nx1-lokitype"') do @set "lokitest=%%a"
 if "%lokitest%" == "LOKI" (
-  "%bin%"\file -m %rel%\androidbootimg.magic "%file%" | "%bin%"\cut -d: -f2- | "%bin%"\cut -d: -f2 | "%bin%"\cut -d( -f2 | "%bin%"\cut -d^) -f1 > "%~nx1-lokitype"
+  "%bin%"\file -m "%bin%\androidbootimg.magic" "%file%" 2>nul | "%bin%"\cut -d: -f2- | "%bin%"\cut -d: -f2 | "%bin%"\cut -d( -f2 | "%bin%"\cut -d^) -f1 > "%~nx1-lokitype"
   for /f "delims=" %%a in ('type "%~nx1-lokitype"') do @echo Loki patch with "%%a" type detected, reverting . . .
   echo.
   echo Warning: A dump of your device's aboot.img is required to re-Loki!
@@ -127,16 +142,30 @@ if "%lokitest%" == "LOKI" (
   del "%~nx1-lokitype"
 )
 
-"%bin%"\tail -n50 "%file%" 2>nul | "%bin%"\file -m %rel%\androidbootimg.magic - | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-tailtype"
+"%bin%"\tail -n50 "%file%" 2>nul | "%bin%"\file -m "%bin%\androidbootimg.magic" - 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-tailtype"
 for /f "delims=" %%a in ('type "%~nx1-tailtype"') do @set "tailtype=%%a"
 if not "%tailtype%" == "AVB" if not "%tailtype%" == "Bump" if not "%tailtype%" == "SEAndroid" del "%~nx1-tailtype"
 if "%tailtype%" == "AVB" (
-  "%bin%"\tail -n50 "%file%" 2>nul | "%bin%"\file -m %rel%\androidbootimg.magic - | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f6 > "%~nx1-avbtype"
+  "%bin%"\tail -n50 "%file%" 2>nul | "%bin%"\file -m "%bin%\androidbootimg.magic" - 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f6 > "%~nx1-avbtype"
   echo Signature with "%tailtype%" type detected. & echo.
   move /y "%~nx1-tailtype" "%~nx1-sigtype" >nul
 )
 if exist "*-tailtype" echo Footer with "%tailtype%" type detected. & echo.
 
+if not "%imgtype%" == "U-Boot" goto skiptrim
+"%bin%"\hexdump -n 4 -s 12 -e '16/1 "%%02x""\n"' "%file%" > "%~nx1-sizetest"
+for /f "delims=" %%a in ('type "%~nx1-sizetest"') do @"%bin%"\printf '%%d\n' 0x%%a > "%~nx1-sizetest"
+for /f "delims=" %%a in ('type "%~nx1-sizetest"') do @set /a "imgsize = %%a + 64"
+for /f "usebackq" %%a in ('%file%') do @set "filesize=%%~za"
+if not "%imgsize%" == "%filesize%" (
+  echo Trimming . . .
+  echo.
+  for /f "delims=" %%a in ('call echo %%imgsize%%') do @"%bin%"\dd bs=%%a count=1 conv=notrunc if="%file%" of="%~nx1" 2>nul
+  set "file=%~nx1"
+)
+del "%~nx1-sizetest"
+
+:skiptrim
 echo Splitting image to "split_img/" . . .
 echo.
 if "%imgtype%" == "AOSP" "%bin%"\unpackbootimg -i "%file%"
@@ -149,6 +178,17 @@ if "%imgtype%" == "ELF" (
   "%bin%"\unpackelf -i "%file%"
 )
 if "%imgtype%" == "KRNL" "%bin%"\dd bs=4096 skip=8 iflag=skip_bytes conv=notrunc if="%file%" of="%~nx1-ramdisk.cpio.gz" 2>&1 | "%bin%"\tail -n+3 | "%bin%"\cut -d" " -f1-2
+if "%imgtype%" == "OSIP" (
+  "%bin%"\mboot -u -f "%file%"
+  if errorlevel == 1 set "error=1"
+  move /y hdr "%~nx1-header" >nul 2>&1
+  move /y sig "%~nx1-sig" >nul 2>&1
+  move /y cmdline.txt "%~nx1-cmdline" >nul 2>&1
+  move /y parameter "%~nx1-parameter" >nul 2>&1
+  move /y bootstub "%~nx1-bootstub" >nul 2>&1
+  move /y kernel "%~nx1-zImage" >nul 2>&1
+  move /y ramdisk.cpio.gz "%~nx1-ramdisk.cpio.gz" >nul 2>&1
+)
 if "%imgtype%" == "U-Boot" (
   "%bin%"\dumpimage -l "%file%"
   "%bin%"\dumpimage -l "%file%" > "%~nx1-header"
@@ -160,16 +200,22 @@ if "%imgtype%" == "U-Boot" (
   type "%~nx1-header" | findstr "Address:" | "%bin%"\cut -c15- > "%~nx1-addr"
   type "%~nx1-header" | findstr "Point:" | "%bin%"\cut -c15- > "%~nx1-ep"
   del "%~nx1-header"
-  "%bin%"\dumpimage -i "%file%" -p 0 "%~nx1-zImage"
+  "%bin%"\dumpimage -p 0 -o "%~nx1-zImage" "%file%"
+  if errorlevel == 1 set "error=1"
   for /f "delims=" %%a in ('type "%~nx1-type"') do (
     if "%%a" == "Multi" (
-      "%bin%"\dumpimage -i "%file%" -p 1 "%~nx1-ramdisk.cpio.gz"
+      "%bin%"\dumpimage -p 1 -o "%~nx1-ramdisk.cpio.gz" "%file%"
     ) else (
       copy /y nul "%~nx1-ramdisk.cpio.gz" >nul
     )
   )
 )
-if errorlevel == 1 call "%aik%\cleanup.bat" >nul & goto error
+if errorlevel == 1 set "error=1"
+if "%error%" == "1" (
+  cd ..
+  call "%aik%\cleanup.bat" %local% >nul
+  goto error
+)
 echo.
 
 if "%imgtype%" == "AOSP" (
@@ -178,7 +224,7 @@ if "%imgtype%" == "AOSP" (
   )
 )
 
-"%bin%"\file -m %rel%\androidbootimg.magic *-zImage | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-mtktest"
+"%bin%"\file -m "%bin%\androidbootimg.magic" *-zImage 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-mtktest"
 for /f "delims=" %%a in ('type "%~nx1-mtktest"') do @set "mtktest=%%a"
 if "%mtktest%" == "MTK" (
   set "mtk=1"
@@ -187,9 +233,9 @@ if "%mtktest%" == "MTK" (
   move /y tempzimg "%~nx1-zImage" >nul
 )
 for /f "delims=" %%a in ('dir /b *-ramdisk*.gz') do @set "ramdiskname=%%a"
-"%bin%"\file -m %rel%\androidbootimg.magic "%ramdiskname%" | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-mtktest"
+"%bin%"\file -m "%bin%\androidbootimg.magic" "%ramdiskname%" 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-mtktest"
 for /f "delims=" %%a in ('type "%~nx1-mtktest"') do @set "mtktest=%%a"
-"%bin%"\file -m %rel%\androidbootimg.magic "%ramdiskname%" | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f4 > "%~nx1-mtktype"
+"%bin%"\file -m "%bin%\androidbootimg.magic" "%ramdiskname%" 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f4 > "%~nx1-mtktype"
 for /f "delims=" %%a in ('type "%~nx1-mtktype"') do @set "mtktype=%%a"
 if "%mtktest%" == "MTK" (
   if not defined mtk echo Warning: No MTK header found in zImage! & set "mtk=1"
@@ -209,40 +255,43 @@ if "%mtktest%" == "MTK" (
 del "%~nx1-mtktest"
 if defined mtk echo.
 
-if exist "*-dtb" (
-  "%bin%"\file -m %rel%\androidbootimg.magic *-dtb | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-dtbtype"
-  for /f "delims=" %%a in ('type "%~nx1-dtbtype"') do (
+if exist "*-dt" (
+  "%bin%"\file -m "%bin%\androidbootimg.magic" *-dt 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-dttype"
+  for /f "delims=" %%a in ('type "%~nx1-dttype"') do (
     if "%imgtype%" == "ELF" if not "%%a" == "QCDT" if not "%%a" == "ELF" (
-      echo Non-QC DTB found, packing zImage and appending . . .
+      echo Non-QC DT found, packing zImage and appending . . .
       echo.
       "%bin%"\gzip --no-name -9 "%~nx1-zImage"
-      copy /b "%~nx1-zImage.gz"+"%~nx1-dtb" "%~nx1-zImage" >nul
-      del *-dtb* *-zImage.gz
+      copy /b "%~nx1-zImage.gz"+"%~nx1-dt" "%~nx1-zImage" >nul
+      del "%~nx1-dt"* "%~nx1-zImage.gz"
     )
   )
 )
 
-"%bin%"\file -m %rel%\magic *-ramdisk*.gz | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-ramdiskcomp"
+"%bin%"\file -m "%bin%\magic" *-ramdisk*.gz 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-ramdiskcomp"
 for /f "delims=" %%a in ('type "%~nx1-ramdiskcomp"') do @set "ramdiskcomp=%%a"
+set "unpackcmd=%ramdiskcomp% -dc"
+set "compext=%ramdiskcomp%"
 if "%ramdiskcomp%" == "gzip" set "unpackcmd=gzip -dcq" & set "compext=gz"
-if "%ramdiskcomp%" == "lzop" set "unpackcmd=lzop -dc" & set "compext=lzo"
-if "%ramdiskcomp%" == "lzma" set "unpackcmd=xz -dc" & set "compext=lzma"
-if "%ramdiskcomp%" == "xz" set "unpackcmd=xz -dc" & set "compext=xz"
-if "%ramdiskcomp%" == "bzip2" set "unpackcmd=bzip2 -dc" & set "compext=bz2"
-if "%ramdiskcomp%" == "lz4" set "unpackcmd=lz4 -dcq" & set "compext=lz4"
+if "%ramdiskcomp%" == "lzop" set "compext=lzo"
+if "%ramdiskcomp%" == "lzma" set "unpackcmd=xz -dc"
+if "%ramdiskcomp%" == "bzip2" set "compext=bz2"
+if "%ramdiskcomp%" == "lz4" set "unpackcmd=lz4 -dcq"
+if "%ramdiskcomp%" == "cpio" set "unpackcmd=cat" & set "compext="
 if "%ramdiskcomp%" == "empty" set "compext=empty"
-ren *ramdisk*.gz *ramdisk.cpio.%compext%
+if defined compext set "compext=.%compext%"
+ren *ramdisk*.gz *ramdisk.cpio%compext%
 cd ..
 if "%ramdiskcomp%" == "data" echo Unrecognized format. & goto error
 
-if "%ramdiskcomp%" == "empty" echo Warning: No ramdisk found to be unpacked! & goto nord
+if "%ramdiskcomp%" == "empty" if not "%ramdiskcomp%" == "cpio" echo Warning: No ramdisk found to be unpacked! & goto nord
 echo Unpacking ramdisk to "ramdisk/" . . .
 echo.
 cd ramdisk
 if errorlevel == 1 goto error
 echo Compression used: %ramdiskcomp%
-if not defined compext echo. & echo Unsupported format. & goto error
-"%bin%"\%unpackcmd% "..\split_img\%~nx1-ramdisk.cpio.%compext%" | "%bin%"\cpio -i -d --no-absolute-filenames
+if not defined compext if not "%ramdiskcomp%" == "cpio" echo. & echo Unsupported format. & goto error
+"%bin%"\%unpackcmd% "..\split_img\%~nx1-ramdisk.cpio%compext%" | "%bin%"\cpio -i -d --no-absolute-filenames
 if errorlevel == 1 goto error
 cd ..
 :nord
