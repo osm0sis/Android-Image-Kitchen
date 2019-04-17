@@ -13,11 +13,12 @@ if $BOOTMODE; then
   OUTFD=/proc/self/fd/0;
   dev=/dev;
   devtmp=/dev/tmp;
-  if [ ! -f /data/$adb/magisk_merge.img ]; then
+  if [ ! -f /data/$adb/magisk_merge.img -a ! -e /data/adb/modules ]; then
     (/system/bin/make_ext4fs -b 4096 -l 64M /data/$adb/magisk_merge.img || /system/bin/mke2fs -b 4096 -t ext4 /data/$adb/magisk_merge.img 64M) >/dev/null;
   fi;
   test -e /magisk/.core/busybox && magiskbb=/magisk/.core/busybox;
   test -e /sbin/.core/busybox && magiskbb=/sbin/.core/busybox;
+  test -e /sbin/.magisk/busybox && magiskbb=/sbin/.magisk/busybox;
   test "$magiskbb" && export PATH="$magiskbb:$PATH";
 fi;
 
@@ -77,14 +78,14 @@ set_progress 0.3;
 
 ui_print " ";
 ui_print "Installing to /data/local/AIK-mobile/ ...";
-abi=`getprop ro.product.cpu.abi`;
+abi=`file_getprop $root/system/build.prop ro.product.cpu.abi`;
 case $abi in
   arm*|x86*|mips*) ;;
-  *) abi=`file_getprop /default.prop ro.product.cpu.abi`;;
+  *) abi=`getprop ro.product.cpu.abi`;;
 esac;
 case $abi in
   arm*|x86*|mips*) ;;
-  *) abi=`file_getprop $root/system/build.prop ro.product.cpu.abi`;;
+  *) abi=`file_getprop /default.prop ro.product.cpu.abi`;;
 esac;
 case $abi in
   arm64*) arch=arm64;;
@@ -111,12 +112,12 @@ set_perm 0 0 0644 "/data/local/AIK-mobile/authors.txt" "/data/local/AIK-mobile/b
 set_progress 0.8;
 
 # Magisk clean flash support
-if [ -e /data/$adb/magisk -a ! -e /data/$adb/magisk.img ]; then
+if [ -e /data/$adb/magisk -a ! -e /data/$adb/magisk.img -a ! -e /data/adb/modules ]; then
   make_ext4fs -b 4096 -l 64M /data/$adb/magisk.img || mke2fs -b 4096 -t ext4 /data/$adb/magisk.img 64M;
 fi;
 
 ui_print " ";
-suimg=$(ls /data/$adb/magisk_merge.img || ls /data/su.img || ls /cache/su.img || ls /data/$adb/magisk.img || ls /cache/magisk.img) 2>/dev/null;
+suimg=`(ls /data/$adb/magisk_merge.img || ls /data/su.img || ls /cache/su.img || ls /data/$adb/magisk.img || ls /cache/magisk.img) 2>/dev/null`;
 mnt=$devtmp/$(basename $suimg .img);
 if [ "$suimg" ]; then
   umount $mnt;
@@ -139,6 +140,10 @@ else
   mnt=$(dirname `find /data -name supersu_is_here | head -n1` 2>/dev/null);
   if [ -e "$mnt" ]; then
     target=$mnt/bin;
+  elif [ -e "/data/adb/modules" ]; then
+    mnt=/data/adb/modules_update;
+    magisk=/$modname/system;
+    target=$mnt$magisk/bin;
   else
     mount -o rw,remount /system;
     mount /system;
@@ -152,8 +157,10 @@ if [ "$magisk" ]; then
   cp -f module.prop "$mnt/$modname/";
   touch "$mnt/$modname/auto_mount";
   chcon -hR 'u:object_r:system_file:s0' "$mnt/$modname";
-  if $BOOTMODE && [ "$suimg" == "/data/$adb/magisk_merge.img" ]; then
+  if $BOOTMODE; then
     test -e /magisk && imgmnt=/magisk || imgmnt=/sbin/.core/img;
+    test -e /sbin/.magisk/img && imgmnt=/sbin/.magisk/img;
+    test -e /data/adb/modules && imgmnt=/data/adb/modules;
     mkdir -p "$imgmnt/$modname";
     touch "$imgmnt/$modname/update";
     cp -f module.prop "$imgmnt/$modname/";

@@ -15,6 +15,9 @@ unpackelf:
 https://github.com/tobiaswaldvogel/and_boot_tools/tree/master/bootimg (initial source)
 https://github.com/osm0sis/unpackelf (patches)
 
+mboot:
+https://github.com/osm0sis/mboot
+
 dumpimage, mkimage:
 https://www.denx.de/wiki/U-Boot/WebHome
 

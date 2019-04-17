@@ -8,19 +8,21 @@ bb=$aik/bin/busybox;
 case $1 in
   --restore)
     # fix shortcut script
+    imgmnt=$(su -c "(ls -d /magisk || ls -d /sbin/.core/img || ls -d /sbin/.magisk/img || ls -d /data/adb/modules) 2>/dev/null");
+    test "$imgmnt" && rbmsg=' \(reboot required\)';
     su -c " \
+      chmod 755 $aik/bin/aik; \
+      chown root:root $aik/bin/aik; \
       if [ -e /su ]; then \
         cp -pf $aik/bin/aik /su/bin/aik; \
       elif [ -e /sbin/supersu ]; then \
         cp -pf $aik/bin/aik /sbin/supersu/bin/aik; \
-      elif [ -e /magisk -o -e /sbin/.core/img ]; then \
-        test -e /magisk && imgmnt=/magisk || imgmnt=/sbin/.core/img; \
+      elif [ "$imgmnt" ]; then \
         mkdir -p $imgmnt/aik-mobile/system/bin; \
         cp -pf $aik/bin/aik $imgmnt/aik-mobile/system/bin/aik; \
         cp -pf $aik/bin/module.prop $imgmnt/aik-mobile/module.prop; \
-        touch $imgmnt/aik-mobile/auto_mount; \
+        touch $imgmnt/aik-mobile/auto_mount $imgmnt/aik-mobile/update; \
         chcon -hR 'u:object_r:system_file:s0' $imgmnt/aik-mobile; \
-        rbmsg=' (reboot required)'; \
       else \
         $bb mount -o rw,remount -t auto /system; \
         rm -f /system/xbin/aik; \
@@ -34,8 +36,8 @@ case $1 in
     # remove AIK-mobile and shortcut script
     su -c " \
       $aik/cleanup.sh --quiet; \
-      if [ -e /su -o -e /sbin/supersu -o -e /magisk -o -e /sbin/.core/img ]; then \
-        rm -rf $aik /su/bin/aik /sbin/supersu/bin/aik /magisk/aik-mobile /sbin/.core/img/aik-mobile; \
+      if [ -e /su -o -e /sbin/supersu -o -e /magisk -o -e /sbin/.core/img -o -e /sbin/.magisk/img -o -e /data/adb/modules ]; then \
+        rm -rf $aik /su/bin/aik /sbin/supersu/bin/aik /magisk/aik-mobile /sbin/.core/img/aik-mobile /sbin/.magisk/img/aik-mobile /data/adb/modules/aik-mobile; \
       else \
         $bb mount -o rw,remount -t auto /system; \
         rm -rf $aik /system/xbin/aik; \

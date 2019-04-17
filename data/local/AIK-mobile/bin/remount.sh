@@ -12,6 +12,8 @@ aik="$(pwd)";
 bin="$aik/bin";
 
 bb=$bin/busybox;
+chmod -R 755 $bin $aik/*.sh;
+chmod 644 $bin/magic $bin/androidbootimg.magic $bin/BootSignature_Android.jar $bin/module.prop $bin/ramdisk.img $bin/avb/* $bin/chromeos/*;
 
 if [ ! -f $bb ]; then
   bb=busybox;

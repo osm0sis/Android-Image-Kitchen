@@ -13,7 +13,10 @@ esac;
 aik="$(dirname "$(readlink -f "$aik")")";
 bin="$aik/bin";
 
+cd $aik;
 bb=$bin/busybox;
+chmod -R 755 $bin $aik/*.sh;
+chmod 644 $bin/magic $bin/androidbootimg.magic $bin/BootSignature_Android.jar $bin/module.prop $bin/ramdisk.img $bin/avb/* $bin/chromeos/*;
 
 if [ ! -f $bb ]; then
   bb=busybox;
@@ -21,7 +24,6 @@ fi;
 
 test "$($bb ps | $bb grep zygote | $bb grep -v grep)" && su="su -mm" || su=sh;
 
-cd "$aik";
 loop=$($bb mount | $bb grep $aik/ramdisk | $bb cut -d" " -f1);
 $su -c "$bb umount $aik/ramdisk" 2>/dev/null;
 $bb losetup -d $loop 2>/dev/null;
