@@ -25,26 +25,13 @@ if [ ! -f $bb ]; then
   bb=busybox;
 fi;
 
-test "$($bb ps | $bb grep zygote | $bb grep -v grep)" && su="su -mm" || su=sh;
-
 if [ -z "$(ls split_img/* 2>/dev/null)" -o ! -e ramdisk ]; then
   echo "No files found to be packed/built.";
   abort;
   return 1;
 fi;
 
-if [ ! "$($bb mount | $bb grep " $aik/ramdisk ")" ]; then
-  $su -c "$bb mount -t ext4 -o rw,noatime $aik/split_img/.aik-ramdisk.img $aik/ramdisk" 2>/dev/null;
-  if [ $? != "0" ]; then
-    for i in 0 1 2 3 4 5 6 7; do
-      loop=/dev/block/loop$i;
-      $bb mknod $loop b 7 $i 2>/dev/null;
-      $bb losetup $loop $aik/split_img/.aik-ramdisk.img 2>/dev/null;
-      test "$($bb losetup $loop | $bb grep $aik)" && break;
-    done;
-    $su -c "$bb mount -t ext4 -o loop,noatime $loop $aik/ramdisk" || return 1;
-  fi;
-fi;
+$bin/remount.sh --mount-only || return 1;
 
 while [ "$1" ]; do
   case $1 in
@@ -112,7 +99,7 @@ else
   fi;
   cd ramdisk;
   $bb find . | $bb cpio -H newc -o 2>/dev/null | $repackcmd > ../ramdisk-new.cpio$compext;
-  if [ $? != "0" ]; then
+  if [ $? != 0 ]; then
     abort;
     return 1;
   fi;
@@ -122,8 +109,8 @@ fi;
 echo "\nGetting build information...";
 cd split_img;
 imgtype=`cat *-imgtype`;
-if [ "$imgtype" != "KRNL" ]; then
-  kernel=`ls *-zImage`;                   echo "kernel = $kernel";
+if [ "$imgtype" != "KRNL" -a -f *-zImage ]; then
+  kernel=`ls *-zImage`;                 echo "kernel = $kernel";
   kernel="split_img/$kernel";
 fi;
 if [ "$original" ]; then
@@ -214,7 +201,7 @@ if [ -f split_img/*-mtktype ]; then
   echo "\nGenerating MTK headers...\n";
   echo "Using ramdisk type: $mtktype";
   $bin/mkmtkhdr --kernel "$kernel" --$mtktype "$ramdisk" >/dev/null;
-  if [ $? != "0" ]; then
+  if [ $? != 0 ]; then
     abort;
     return 1;
   fi;
@@ -252,12 +239,16 @@ case $imgtype in
     $bin/mboot -d split_img/.temp -f $outname;
   ;;
   U-Boot)
-    test "$type" == "Multi" && uramdisk=(:"$ramdisk");
-    $bin/mkimage -A $arch -O $os -T $type -C $comp -a $addr -e $ep -n "$name" -d "$kernel""${uramdisk[@]}" $outname >/dev/null;
+    part0="$kernel";
+    case $type in
+      Multi) part1=(:"$ramdisk");;
+      RAMDisk) part0="$ramdisk";;
+    esac;
+    $bin/mkimage -A $arch -O $os -T $type -C $comp -a $addr -e $ep -n "$name" -d "$part0""${part1[@]}" $outname >/dev/null;
   ;;
   *) echo "\nUnsupported format."; abort; return 1;;
 esac;
-if [ $? != "0" ]; then
+if [ $? != 0 ]; then
   abort;
   return 1;
 fi;
@@ -276,7 +267,7 @@ if [ -f split_img/*-sigtype ]; then
   echo "Using signature: $sigtype $avbtype$avbtxt$blobtype\n";
   test ! "$avbkey" && avbkey="$bin/avb/verity";
   case $sigtype in
-    AVB) dalvikvm -Xbootclasspath:/system/framework/core-oj.jar:/system/framework/core-libart.jar:/system/framework/conscrypt.jar:/system/framework/bouncycastle.jar -Xnodex2oat -Xnoimage-dex2oat -cp $bin/BootSignature_Android.jar com.android.verity.BootSignature /$avbtype unsigned-new.img "$avbkey.pk8" "$avbkey.x509."* image-new.img 2>/dev/null;;
+    AVBv1) dalvikvm -Xbootclasspath:/system/framework/core-oj.jar:/system/framework/core-libart.jar:/system/framework/conscrypt.jar:/system/framework/bouncycastle.jar -Xnodex2oat -Xnoimage-dex2oat -cp $bin/BootSignature_Android.jar com.android.verity.BootSignature /$avbtype unsigned-new.img "$avbkey.pk8" "$avbkey.x509."* image-new.img 2>/dev/null;;
     BLOB)
       $bb printf '-SIGNED-BY-SIGNBLOB-\00\00\00\00\00\00\00\00' > image-new.img;
       $bin/blobpack tempblob $blobtype unsigned-new.img >/dev/null;
@@ -290,7 +281,7 @@ if [ -f split_img/*-sigtype ]; then
     ;;
     NOOK*) cat split_img/*-master_boot.key unsigned-new.img > image-new.img;;
   esac;
-  if [ $? != "0" ]; then
+  if [ $? != 0 ]; then
     abort;
     return 1;
   fi;
@@ -303,7 +294,7 @@ if [ -f split_img/*-lokitype ]; then
   $bb mv -f image-new.img unlokied-new.img;
   if [ -f aboot.img ]; then
     $bin/loki_tool patch $lokitype aboot.img unlokied-new.img image-new.img >/dev/null;
-    if [ $? != "0" ]; then
+    if [ $? != 0 ]; then
       echo "Patching failed.";
       abort;
       return 1;

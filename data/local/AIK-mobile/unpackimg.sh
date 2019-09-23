@@ -26,8 +26,6 @@ if [ ! -f $bb ]; then
   bb=busybox;
 fi;
 
-test "$($bb ps | $bb grep zygote | $bb grep -v grep)" && su="su -mm" || su=sh;
-
 test -f "$cur/$1" && img="$cur/$1" || img="$1";
 if [ ! "$img" ]; then
   $bb ls *.elf *.img *.sin 2>/dev/null |& while IFS= read -r -p line; do
@@ -65,18 +63,7 @@ chmod 666 ramdisk/README;
 cp -fp $bin/remount.sh ramdisk/remount.sh;
 cp -f $bin/ramdisk.img split_img/.aik-ramdisk.img;
 
-if [ ! "$($bb mount | $bb grep " $aik/ramdisk ")" ]; then
-  $su -c "$bb mount -t ext4 -o rw,noatime $aik/split_img/.aik-ramdisk.img $aik/ramdisk" 2>/dev/null;
-  if [ $? != "0" ]; then
-    for i in 0 1 2 3 4 5 6 7; do
-      loop=/dev/block/loop$i;
-      $bb mknod $loop b 7 $i 2>/dev/null;
-      $bb losetup $loop $aik/split_img/.aik-ramdisk.img 2>/dev/null;
-      test "$($bb losetup $loop | $bb grep $aik)" && break;
-    done;
-    $su -c "$bb mount -t ext4 -o loop,noatime $loop $aik/ramdisk" || return 1;
-  fi;
-fi;
+$bin/remount.sh --mount-only || return 1;
 
 cd split_img;
 imgtest="$($bin/file -m $bin/androidbootimg.magic "$img" 2>/dev/null | $bb cut -d: -f2-)";
@@ -100,7 +87,7 @@ if [ "$(echo $imgtest | $bb awk '{ print $2 }' | $bb cut -d, -f1)" == "signing" 
       $bb dd bs=262144 count=1 conv=notrunc if="$img" of="$file-master_boot.key" 2>/dev/null;
       $bb dd bs=262144 skip=1 conv=notrunc if="$img" of="$file" 2>/dev/null;
     ;;
-    SIN)
+    SIN*)
       $bin/kernel_dump . "$img" >/dev/null;
       $bb mv -f "$file."* "$file";
       rm -rf "$file-sigtype";
@@ -143,19 +130,28 @@ if [ "$(echo $imgtest | $bb awk '{ print $3 }')" == "LOKI" ]; then
   img="$file";
 fi;
 
-trim=$($bb od -Ad -tx8 "$img" | $bb tail -n3 | $bb sed 's/*/-/g');
-if [ "$(echo $trim | $bb awk '{ print $(NF-3) $(NF-2) $(NF-1) }')" == "00000000000000000000000000000000-" ]; then
-  offset=$(echo $trim | $bb awk '{ print $(NF-4) }');
-else
-  offset=$(echo $trim | $bb awk '{ print $NF }');
-fi;
-tailtest="$($bb dd if="$img" iflag=skip_bytes skip=$((offset-8192)) bs=8192 count=1 2>/dev/null | $bin/file -m $bin/androidbootimg.magic - 2>/dev/null | $bb cut -d: -f2-)";
+tailtest="$($bb dd if="$img" iflag=skip_bytes skip=$(($(wc -c < "$img") - 8192)) bs=8192 count=1 2>/dev/null | $bin/file -m $bin/androidbootimg.magic - 2>/dev/null | $bb cut -d: -f2-)";
+case $tailtest in
+  *data)
+    trim=$($bb od -Ad -tx8 "$img" | $bb tail -n3 | $bb sed 's/*/-/g');
+    if [ "$(echo $trim | $bb awk '{ print $(NF-3) $(NF-2) $(NF-1) }')" == "00000000000000000000000000000000-" ]; then
+      offset=$(echo $trim | $bb awk '{ print $(NF-4) }');
+    else
+      offset=$(echo $trim | $bb awk '{ print $NF }');
+    fi;
+    tailtest="$($bb dd if="$img" iflag=skip_bytes skip=$((offset - 8192)) bs=8192 count=1 2>/dev/null | $bin/file -m $bin/androidbootimg.magic - 2>/dev/null | $bb cut -d: -f2-)";
+  ;;
+esac;
 tailtype="$(echo $tailtest | $bb awk '{ print $1 }')";
 case $tailtype in
-  AVB)
+  AVB*)
     echo "Signature with \"$tailtype\" type detected.\n";
-    echo $tailtype > "$file-sigtype";
-    echo $tailtest | $bb awk '{ print $5 }' > "$file-avbtype";
+    case $tailtype in
+      *v1)
+        echo $tailtype > "$file-sigtype";
+        echo $tailtest | $bb awk '{ print $4 }' > "$file-avbtype";
+      ;;
+    esac;
   ;;
   Bump|SEAndroid)
     echo "Footer with \"$tailtype\" type detected.\n";
@@ -186,7 +182,7 @@ case $imgtype in
   KRNL) $bb dd bs=4096 skip=8 iflag=skip_bytes conv=notrunc if="$img" of="$file-ramdisk.cpio.gz" 2>&1 | $bb tail -n+3 | $bb cut -d" " -f1-2;;
   OSIP)
     $bin/mboot -u -f "$img";
-    test $? != "0" && error=1;
+    test $? != 0 && error=1;
     for i in bootstub cmdline.txt hdr kernel parameter ramdisk.cpio.gz sig; do
       $bb mv -f $i "$file-$($bb basename $i .txt | $bb sed -e 's/hdr/header/' -e 's/kernel/zImage/')" 2>/dev/null || true;
     done;
@@ -203,15 +199,15 @@ case $imgtype in
     $bb grep "Point:" "$file-header" | $bb cut -c15- > "$file-ep";
     rm -rf "$file-header";
     $bin/dumpimage -p 0 -o "$file-zImage" "$img";
-    test $? != "0" && error=1;
-    if [ "$(cat "$file-type")" == "Multi" ]; then
-      $bin/dumpimage -p 1 -o "$file-ramdisk.cpio.gz" "$img";
-    else
-      touch "$file-ramdisk.cpio.gz";
-    fi;
+    test $? != 0 && error=1;
+    case $(cat "$file-type") in
+      Multi) $bin/dumpimage -p 1 -o "$file-ramdisk.cpio.gz" "$img";;
+      RAMDisk) $bb mv -f "$file-zImage" "$file-ramdisk.cpio.gz";;
+      *) touch "$file-ramdisk.cpio.gz";;
+    esac;
   ;;
 esac;
-if [ $? != "0" -o "$error" ]; then
+if [ $? != 0 -o "$error" ]; then
   cd ..;
   cleanup;
   abort;
@@ -302,7 +298,7 @@ else
   fi;
   cd ramdisk;
   $unpackcmd "../split_img/$file-ramdisk.cpio$compext" | EXTRACT_UNSAFE_SYMLINKS=1 $bb cpio -i -d 2>&1;
-  if [ $? != "0" ]; then
+  if [ $? != 0 ]; then
     cd ..;
     abort;
     return 1;

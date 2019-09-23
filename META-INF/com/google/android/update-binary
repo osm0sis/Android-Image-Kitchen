@@ -5,7 +5,7 @@
 OUTFD=/proc/self/fd/$2;
 ZIPFILE="$3";
 
-# Magisk boot mode support
+# Magisk Manager/booted flashing support
 test -e /data/adb/magisk && adb=adb;
 ps | grep zygote | grep -v grep >/dev/null && BOOTMODE=true || BOOTMODE=false;
 $BOOTMODE || ps -A 2>/dev/null | grep zygote | grep -v grep >/dev/null && BOOTMODE=true;
@@ -13,13 +13,15 @@ if $BOOTMODE; then
   OUTFD=/proc/self/fd/0;
   dev=/dev;
   devtmp=/dev/tmp;
-  if [ ! -f /data/$adb/magisk_merge.img -a ! -e /data/adb/modules ]; then
-    (/system/bin/make_ext4fs -b 4096 -l 64M /data/$adb/magisk_merge.img || /system/bin/mke2fs -b 4096 -t ext4 /data/$adb/magisk_merge.img 64M) >/dev/null;
+  if [ -e /data/$adb/magisk ]; then
+    if [ ! -f /data/$adb/magisk_merge.img -a ! -e /data/adb/modules ]; then
+      (/system/bin/make_ext4fs -b 4096 -l 64M /data/$adb/magisk_merge.img || /system/bin/mke2fs -b 4096 -t ext4 /data/$adb/magisk_merge.img 64M) >/dev/null;
+    fi;
+    test -e /magisk/.core/busybox && magiskbb=/magisk/.core/busybox;
+    test -e /sbin/.core/busybox && magiskbb=/sbin/.core/busybox;
+    test -e /sbin/.magisk/busybox && magiskbb=/sbin/.magisk/busybox;
+    test "$magiskbb" && export PATH="$magiskbb:$PATH";
   fi;
-  test -e /magisk/.core/busybox && magiskbb=/magisk/.core/busybox;
-  test -e /sbin/.core/busybox && magiskbb=/sbin/.core/busybox;
-  test -e /sbin/.magisk/busybox && magiskbb=/sbin/.magisk/busybox;
-  test "$magiskbb" && export PATH="$magiskbb:$PATH";
 fi;
 
 ui_print() { $BOOTMODE && echo "$1" || echo -e "ui_print $1\nui_print" >> $OUTFD; }
@@ -48,6 +50,8 @@ abort() {
   ui_print " ";
   ui_print "Script will now exit...";
   ui_print " ";
+  test "$suimg" && umount $mnt;
+  test "$sar" && mount -o ro,remount /;
   umount /system;
   umount /data;
   umount /cache;
@@ -98,9 +102,10 @@ case $abi in
 esac;
 ui_print "Using architecture: $arch";
 cd bin;
-# work around old Magisk Manager PATH issue leading to toybox's limited tar being used
-bb=$(which busybox 2>/dev/null);
-$bb tar -xJf $arch.tar.xz;
+# work around scenarios where toybox's limited tar would be used (old Magisk Manager PATH issue, TWRPs without busybox)
+tar -xzf xz.tar.gz $arch/xz;
+set_perm 0 0 755 $arch/xz;
+$arch/xz -dc $arch.tar.xz | tar -x;
 cd ..;
 rm -r /data/local/AIK-mobile;
 cp -rf data/* /data;
@@ -145,8 +150,7 @@ else
     magisk=/$modname/system;
     target=$mnt$magisk/bin;
   else
-    mount -o rw,remount /system;
-    mount /system;
+    mount -o rw,remount /system || mount /system || mount -o rw,remount / && sar=1;
     target=$root/system/xbin;
   fi;
 fi;
@@ -172,6 +176,7 @@ ui_print " ";
 ui_print "Unmounting...";
 test "$suimg" && umount $mnt;
 test "$loop" && losetup -d $loop;
+test "$sar" && mount -o ro,remount /;
 umount /system;
 umount /data;
 umount /cache;
