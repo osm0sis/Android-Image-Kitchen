@@ -1,7 +1,7 @@
 #------------------------------------------------------------------------------
 # Slimmed down magic file for archives only
 #------------------------------------------------------------------------------
-# $File: archive,v 1.124 2019/02/20 15:07:44 christos Exp $
+# $File: archive,v 1.129 2019/05/09 18:58:02 christos Exp $
 # archive:  file(1) magic for archive formats (see also "msdos" for self-
 #           extracting compressed archives)
 #
@@ -148,7 +148,7 @@
 >>>257	string		>\0		\b, comment: %-.40s
 
 # Incremental snapshot gnu-tar format from:
-# http://www.gnu.org/software/tar/manual/html_node/Snapshot-Files.html
+# https://www.gnu.org/software/tar/manual/html_node/Snapshot-Files.html
 0	string		GNU\ tar-	GNU tar incremental snapshot data
 >&0	regex		[0-9]\.[0-9]+-[0-9]+	version %s
 
@@ -226,21 +226,48 @@
 # a portable archive whose first member has a name beginning with
 # "debian".
 #
+# Update: Joerg Jenderek
+# URL: https://en.wikipedia.org/wiki/Deb_(file_format)
 0	string		=!<arch>\ndebian
->8	string		debian-split	part of multipart Debian package
+# https://manpages.debian.org/testing/dpkg/dpkg-split.1.en.html
+>14	string		-split	part of multipart Debian package
 !:mime	application/vnd.debian.binary-package
->8	string		debian-binary	Debian binary package
+# udeb is used for stripped down deb file
+#!:ext	deb/udeb
+>14	string		-binary	Debian binary package
 !:mime	application/vnd.debian.binary-package
->8	string		!debian
+#!:ext	deb/udeb
+# This should not happen
+>14	default		x	Unknown Debian package
+# NL terminated version; for most Debian cases this is 2.0 or 2.1 for splitted
 >68	string		>\0		(format %s)
-# These next two lines do not work, because a bzip2 Debian archive
-# still uses gzip for the control.tar (first in the archive).  Only
-# data.tar varies, and the location of its filename varies too.
-# file/libmagic does not current have support for ascii-string based
-# (offsets) as of 2005-09-15.
-#>81	string		bz2		\b, uses bzip2 compression
-#>84	string		gz		\b, uses gzip compression
-#>136	ledate		x		created: %s
+#>68	string		!2.0\n
+#>>68	string		x		(format %.3s)
+>68	string		=2.0\n
+# 2nd archive name=control archive name like control.tar.gz or control.tar.xz
+>>72	string		>\0		\b, with %.14s
+# look for 3rd archive name=data archive name like data.tar.{gz,xz,bz2,lzma}
+>>0	search/0x93e4f	data.tar.	\b, data compression
+# the above line only works if FILE_BYTES_MAX in ../../src/file.h is raised
+# for example like libreoffice-dev-doc_1%3a5.2.7-1+rpi1+deb9u3_all.deb
+>>>&0	string		x		%.4s
+# splitted debian package case
+>68	string		=2.1\n
+# dpkg-1.18.25/dpkg-split/info.c
+# NL terminated ASCII package name like ckermit
+>>&0	string		x		\b, %s
+# NL terminated package version like 302-5.3
+>>>&1	string		x		%s
+# NL terminated MD5 checksum
+>>>>&1	string		x		\b, MD5 %s
+# NL terminated original package length
+>>>>>&1	string		x		\b, unsplitted size %s
+# NL terminated part length
+>>>>>>&1	string	x		\b, part lenght %s
+# NL terminated package part like n/m
+>>>>>>>&1	string	x		\b, part %s
+# NL terminated package architecture like armhf since dpkg 1.16.1 or later
+>>>>>>>>&1	string	x		\b, %s
 
 #
 # MIPS archive; they're in the portable archive format, and need to go
@@ -819,7 +846,7 @@
 >>0x36	string		>\0			fstype %.8s
 
 # Very old RAR archive
-# http://jasonblanks.com/wp-includes/images/papers/KnowyourarchiveRAR.pdf
+# https://jasonblanks.com/wp-includes/images/papers/KnowyourarchiveRAR.pdf
 0	string		RE\x7e\x5e  RAR archive data (<v1.5)
 !:mime	application/x-rar
 #!:ext	rar/cbr
@@ -842,6 +869,7 @@
 #!:ext zip/cbz
 !:strength +1
 0	string		PK\003\004
+!:strength +1
 
 # Specialised zip formats which start with a member named 'mimetype'
 # (stored uncompressed, with no 'extra field') containing the file's MIME type.
@@ -884,7 +912,7 @@
 >>>62	string	base			Database file
 
 #   OpenDocument formats (for OpenOffice 2.x / StarOffice >= 8)
-#    http://lists.oasis-open.org/archives/office/200505/msg00006.html
+#    https://lists.oasis-open.org/archives/office/200505/msg00006.html
 #    (mimetype contains "application/vnd.oasis.opendocument.<SUBTYPE>")
 >>50	string	vnd.oasis.opendocument.	OpenDocument
 >>>73	string	text
@@ -933,7 +961,7 @@
 !:mime	application/vnd.oasis.opendocument.image-template
 
 #  EPUB (OEBPS) books using OCF (OEBPS Container Format)
-#    http://www.idpf.org/ocf/ocf1.0/download/ocf10.htm, section 4.
+#    https://www.idpf.org/ocf/ocf1.0/download/ocf10.htm, section 4.
 #    From: Ralf Brown <ralf.brown@gmail.com>
 >>50	string	epub+zip	EPUB document
 !:mime application/epub+zip
@@ -1126,7 +1154,7 @@
 >14	beshort	0x4e53		multi-part, with -S
 
 # Symbian installation files
-#  http://www.thouky.co.uk/software/psifs/sis.html
+#  https://www.thouky.co.uk/software/psifs/sis.html
 #  http://developer.symbian.com/main/downloads/papers/SymbianOSv91/softwareinstallsis.pdf
 8	lelong	0x10000419	Symbian installation file
 !:mime	application/vnd.symbian.install
@@ -1143,25 +1171,12 @@
 0	string KGB_arch		KGB Archiver file
 >10	string x		with compression level %.1s
 
-# xar (eXtensible ARchiver) archive
-# xar archive format: http://code.google.com/p/xar/
-# From: "David Remahl" <dremahl@apple.com>
-0	string	xar!		xar archive
-!:mime	application/x-xar
-#>4	beshort	x		header size %d
->6	beshort	x		version %d,
-#>8	quad	x		compressed TOC: %d,
-#>16	quad	x		uncompressed TOC: %d,
->24	belong	0		no checksum
->24	belong	1		SHA-1 checksum
->24	belong	2		MD5 checksum
-
 # Type: Parity Archive
 # From: Daniel van Eeden <daniel_e@dds.nl>
 0	string	PAR2		Parity Archive Volume Set
 
 # Bacula volume format. (Volumes always start with a block header.)
-# URL: http://bacula.org/3.0.x-manuals/en/developers/developers/Block_Header.html
+# URL: https://bacula.org/3.0.x-manuals/en/developers/developers/Block_Header.html
 # From: Adam Buchbinder <adam.buchbinder@gmail.com>
 12	string	BB02		Bacula volume
 >20	bedate	x		\b, started %s
@@ -1176,11 +1191,11 @@
 0	string	zPQ	ZPAQ stream
 >3	byte	x	\b, level %d
 # From: Barry Carter <carter.barry@gmail.com>
-# http://encode.ru/threads/456-zpaq-updates/page32
+# https://encode.ru/threads/456-zpaq-updates/page32
 0	string	7kSt	ZPAQ file
 
 # BBeB ebook, unencrypted (LRF format)
-# URL: http://www.sven.de/librie/Librie/LrfFormat
+# URL: https://www.sven.de/librie/Librie/LrfFormat
 # From: Adam Buchbinder <adam.buchbinder@gmail.com>
 0	string	L\0R\0F\0\0\0	BBeB ebook data, unencrypted
 >8	beshort	x		\b, version %d
@@ -1190,8 +1205,8 @@
 >44	beshort	x		%d)
 
 # Symantec GHOST image by Joerg Jenderek at May 2014
-# http://us.norton.com/ghost/
-# http://www.garykessler.net/library/file_sigs.html
+# https://us.norton.com/ghost/
+# https://www.garykessler.net/library/file_sigs.html
 0		ubelong&0xFFFFf7f0	0xFEEF0100	Norton GHost image
 # *.GHO
 >2		ubyte&0x08		0x00		\b, first file
@@ -1239,8 +1254,8 @@
 56	string	USE\040LYNX\040TO\040DISSOLVE\040THIS\040FILE	 LyNX archive
 
 # From: Joerg Jenderek
-# URL: http://www.acronis.com/
-# Reference: http://en.wikipedia.org/wiki/TIB_(file_format)
+# URL: https://www.acronis.com/
+# Reference: https://en.wikipedia.org/wiki/TIB_(file_format)
 # Note: only tested with True Image 2013 Build 5962 and 2019 Build 14110
 0	ubequad		0xce24b9a220000000	Acronis True Image backup
 !:mime	application/x-acronis-tib
@@ -1270,8 +1285,28 @@
 -4	string	STOP
 >-16	string	XPAKSTOP	Gentoo binary package (XPAK)
 
+# From:		Joerg Jenderek
+# URL:		https://kodi.wiki/view/TexturePacker
+# Reference:	https://mirrors.kodi.tv/releases/source/17.3-Krypton.tar.gz
+# /xbmc-Krypton/xbmc/guilib/XBTF.h
+# /xbmc-Krypton/xbmc/guilib/XBTF.cpp 
+0	string	XBTF
+# skip ASCII text by looking for terminating \0 of path
+>264	ubyte	0		XBMC texture package
+!:mime	application/x-xbmc-xbt
+#!:ext	xbt
+# XBTF_VERSION 2
+>>4	string	!2		\b, version %-.1s
+# nofFiles /xbmc-Krypton/xbmc/guilib/XBTFReader.cpp
+>>5	ulelong	x		\b, %u file
+# plural s
+>>5	ulelong	>1		\bs
+# path[CXBTFFile[MaximumPathLength=256]
+>>9	string	x		\b, 1st %s
+
+
 #------------------------------------------------------------------------------
-# $File: compress,v 1.73 2018/09/01 13:52:39 christos Exp $
+# $File: compress,v 1.75 2019/04/19 00:42:27 christos Exp $
 # compress:  file(1) magic for pure-compression formats (no archives)
 #
 # compress, gzip, pack, compact, huf, squeeze, crunch, freeze, yabba, etc.
@@ -1288,13 +1323,75 @@
 >2	byte&0x1f	x		%d bits
 
 # gzip (GNU zip, not to be confused with Info-ZIP or PKWARE zip archiver)
+# URL: https://en.wikipedia.org/wiki/Gzip
+# Reference: https://tools.ietf.org/html/rfc1952
+# Update: Joerg Jenderek, Apr 2019
 #   Edited by Chris Chittleborough <cchittleborough@yahoo.com.au>, March 2002
 #	* Original filename is only at offset 10 if "extra field" absent
 #	* Produce shorter output - notably, only report compression methods
 #         other than 8 ("deflate", the only method defined in RFC 1952).
-0       string          \037\213        gzip compressed data
-!:mime	application/x-gzip
-!:strength * 2
+# Note: find defs -iname '*.trid.xml' -exec grep -q '<Bytes>1F8B08' {} \; -ls
+# TODO:
+# FBR	Blueberry FlashBack screen Record	https://www.flashbackrecorder.com/
+# KPR	KOffice/Calligra KPresenter		application/x-kpresenter
+# KPT	KOffice/Calligra KPresenter template?	application/x-kpresenter
+# SAV	Diggles Saved Game File			http://www.innonics.com
+# SAV	FarCry (demo) saved game		http://www.farcry-thegame.com
+# DAT	ZOAGZIP game data format		http://en.wikipedia.org/wiki/SD_Gundam_Capsule_Fighter
+0       string          \037\213
+# to display gzip compressed (strength=100=2*50) before other (strength=50)?
+#!:strength * 2
+# no FNAME and FCOMMENT bit implies no file name/comment. That means only binary
+>3	byte&0x18	=0
+# For binary gzipped no ASCII text should occur
+#	mcd-monu-cad.trid.xml
+>>10	string		MCD			Monu-Cad Drawing, Component or Font
+#>>36	string		Created\ with\ MONU-CAD	
+#!:mime	application/octet-stream
+# http://fileformats.archiveteam.org/wiki/Monu-CAD
+#	http://www.monucad.com/downloads/FullDemo-2005.EXE
+#	/HANDS96.MCC	Component
+#	/DEMO_DD01.MCD	Drawing
+#	/MCALF020.FNT	Font
+#!:ext	mcc/mcd/fnt
+# http://www.generalcadd.com
+>>10	string		GXD			General CADD, Drawing or Component
+#!:mime	application/octet-stream
+#	/gxc/BUILDINGEDGE.gxc			Component
+#	/gxd/HOCKETT-STPAUL-WRHSE.gxd		Drawing
+#	/gxd/POWERLAND-MILL-ADD-11.gxd		Drawing		v9.1.06
+#!:ext	gxc/gxd
+#>>>13	ubyte		0			\b, version 0
+>>>13	string		09			\b, version 9
+# other gzipped binary like gzipped tar, VirtualBox extension package,...
+>>10	default		x		gzip compressed data
+# size of the original (uncompressed) input data modulo 2^32
+>>>-4	ulelong		x		\b, original size modulo 2^32 %u
+# gzipped TAR or VirtualBox extension package
+!:mime	application/gzip
+#!:mime	application/x-compressed-tar
+#!:mime	application/x-virtualbox-vbox-extpack
+# https://www.w3.org/TR/SVG/mimereg.html
+#!:mime	image/image/svg+xml-compressed
+#	zlib.3.gz
+#	microcode-20180312.tgz
+#	tpz same as tgz
+#	lua-md5_1.2-1_i386_i486.ipk	https://en.wikipedia.org/wiki/Opkg
+#	Oracle_VM_VirtualBox_Extension_Pack-5.0.12-104815.vbox-extpack
+#!:ext	gz/tgz/tpz/ipk/vbox-extpack/svgz
+# FNAME/FCOMMENT bit implies file name/comment as iso-8859-1 text
+>3	byte&0x18	>0		gzip compressed data
+!:mime	application/gzip
+# gzipped tar, gzipped Abiword document
+#!:mime	application/x-compressed-tar
+#!:mime	application/x-abiword-compressed
+#!:mime	image/image/svg+xml-compressed
+#	kleopatra_splashscreen.svgz	gzipped .svg
+#!:ext	gz/tgz/tpz/zabw/svgz
+# size of the original (uncompressed) input data modulo 2^32
+>>-4	ulelong		x		\b, original size modulo 2^32 %u
+#	display information of gzip compressed files
+#>2	byte		x		THIS iS GZIP
 >2	byte		<8		\b, reserved method
 >2	byte		>8		\b, unknown method
 >3	byte		&0x01		\b, ASCII
@@ -1321,7 +1418,9 @@
 >9	byte		=0x0B		\b, from NTFS filesystem (NT)
 >9	byte		=0x0C		\b, from QDOS
 >9	byte		=0x0D		\b, from Acorn RISCOS
->-4	lelong		x		\b, original size %u
+# size of the original (uncompressed) input data modulo 2^32
+#>-4	ulelong		x		\b, original size modulo 2^32 %u
+#ERROR: line 114: non zero offset 1048572 at level 1
 
 # packed data, Huffman (minimum redundancy) codes on a byte-by-byte basis
 0	string		\037\036	packed data
@@ -1432,7 +1531,7 @@
 >>17	byte		=0x0E		os: Win32
 
 # 4.3BSD-Quasijarus Strong Compression
-# http://minnie.tuhs.org/Quasijarus/compress.html
+# https://minnie.tuhs.org/Quasijarus/compress.html
 0	string		\037\241	Quasijarus strong compressed data
 
 # From: Cory Dikkers <cdikkers@swbell.net>
@@ -1446,7 +1545,7 @@
 >4	belong		0x090A0C0D	best compression
 
 # 7-zip archiver, from Thomas Klausner (wiz@danbala.tuwien.ac.at)
-# http://www.7-zip.org or DOC/7zFormat.txt
+# https://www.7-zip.org or DOC/7zFormat.txt
 #
 0	string		7z\274\257\047\034	7-zip archive data,
 >6	byte		x			version %d
@@ -1475,7 +1574,7 @@
 >5	byte		x			\b.%d
 !:mime	application/x-lrzip
 
-# http://fastcompression.blogspot.fi/2013/04/lz4-streaming-format-final.html
+# https://fastcompression.blogspot.fi/2013/04/lz4-streaming-format-final.html
 0	lelong		0x184d2204	lz4 compressed data (v1.4+)
 !:mime	application/x-lz4
 # Added by osm0sis@xda-developers.com
@@ -1524,11 +1623,11 @@
 >0x8	lelong	x		\b, %u entries
 
 # Snappy framing format
-# http://code.google.com/p/snappy/source/browse/trunk/framing_format.txt
+# https://code.google.com/p/snappy/source/browse/trunk/framing_format.txt
 0	string	\377\006\0\0sNaPpY	snappy framed data
 !:mime	application/x-snappy-framed
 
-# qpress, http://www.quicklz.com/
+# qpress, https://www.quicklz.com/
 0	string	qpress10	qpress compressed data
 !:mime	application/x-qpress
 
@@ -1558,7 +1657,7 @@
 0	string	bvx2	lzfse compressed, compressed tables
 
 #------------------------------------------------------------
-# $File: android,v 1.11 2018/12/04 14:24:01 christos Exp $
+# $File: android,v 1.12 2019/04/19 00:42:27 christos Exp $
 # Various android related magic entries
 #------------------------------------------------------------
 

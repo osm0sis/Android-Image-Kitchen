@@ -73,10 +73,11 @@ if errorlevel == 1 (
 )
 echo Packing ramdisk%sumsg% . . .
 echo.
-if not "[%sumsg%]" == "[]" if not exist "%bin%"\sudo (
+if not "[%sumsg%]" == "[]" if not exist "%bin%"\sudo.exe (
   echo Windows sudo required but not found.
   echo.
-  echo *** Reinstall Android Image Kitchen! ***
+  echo *** Reinstall Android Image Kitchen, then add ***
+  echo *** sudo.exe to your antivirus exceptions!    ***
   echo.
   goto error
 )
@@ -116,6 +117,7 @@ for /f "delims=" %%a in ('dir /b split_img\*-imgtype') do @set "imgtypename=%%a"
 for /f "delims=" %%a in ('type "split_img\%imgtypename%"') do @set "imgtype=%%a"
 
 if "%imgtype%" == "KRNL" goto skipzimg
+if not exist "split_img\*-zImage" goto skipzimg
 for /f "delims=" %%a in ('dir /b split_img\*-zImage') do @set "kernelname=%%a"
 echo kernel = %kernelname% & set "kernel=split_img/%kernelname%"
 :skipzimg
@@ -291,8 +293,12 @@ if "%imgtype%" == "OSIP" (
   "%bin%"\cat "%ramdisk%" > split_img\temp\ramdisk.cpio.gz
 )
 if "%imgtype%" == "OSIP" set "buildcmd=mboot -d split_img\temp -f %outname%"
-if "%imgtype%" == "U-Boot" if "%type%" == "Multi" set "uramdisk=:%ramdisk%"
-if "%imgtype%" == "U-Boot" set "buildcmd=mkimage -A %arch% -O %os% -T %type% -C %comp% -a %addr% -e %ep% -n "%name%" -d "%kernel%"%uramdisk% %outname% >nul"
+if "%imgtype%" == "U-Boot" (
+  set "part0=%kernel%"
+  if "%type%" == "Multi" set "part1=:%ramdisk%"
+  if "%type%" == "RAMDisk" set "part0=%ramdisk%"
+)
+if "%imgtype%" == "U-Boot" set "buildcmd=mkimage -A %arch% -O %os% -T %type% -C %comp% -a %addr% -e %ep% -n "%name%" -d "%part0%"%part1% %outname% >nul"
 
 echo Building image . . .
 echo.
@@ -320,7 +326,7 @@ echo.
 echo Using signature: %sigtype% %avbtype%%avbtxt%%blobtype%
 echo.
 if not defined avbkey set "avbkey=%bin%\avb\verity"
-if "%sigtype%" == "AVB" java -jar "%bin%"\BootSignature.jar /%avbtype% unsigned-new.img "%avbkey%.pk8" "%avbkey%.x509."* image-new.img 2>nul
+if "%sigtype%" == "AVBv1" java -jar "%bin%"\BootSignature.jar /%avbtype% unsigned-new.img "%avbkey%.pk8" "%avbkey%.x509."* image-new.img 2>nul
 if "%sigtype%" == "BLOB" (
   "%bin%"\printf '-SIGNED-BY-SIGNBLOB-\00\00\00\00\00\00\00\00' > image-new.img
   "%bin%"\blobpack tempblob %blobtype% unsigned-new.img >nul
