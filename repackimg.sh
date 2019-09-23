@@ -27,9 +27,15 @@ case $plat in
     cpio="env DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/cpio"";
     statarg="-f %Su";
     dd() { DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/dd" "$@"; }
-    java() { "/Library/Internet Plug-Ins/JavaAppletPlugin.plugin/Contents/Home/bin/java" "$@"; }
     lzop() { DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/lzop" "$@"; }
     xz() { DYLD_LIBRARY_PATH="$bin/$arch" "$bin/$arch/xz" "$@"; }
+
+    javaver=$(java -version 2>&1 | head -n1 | cut -d\" -f2);
+    javamaj=$(echo $javaver | cut -d. -f1);
+    javamin=$(echo $javaver | cut -d. -f2);
+    if [ "$javamaj" -lt 9 ] && [ "$javamaj" -eq 1 -a "$javamin" -lt 8 ]; then
+      java() { "/Library/Internet Plug-Ins/JavaAppletPlugin.plugin/Contents/Home/bin/java" "$@"; }
+    fi;
   ;;
   linux)
     cpio=cpio;
@@ -137,7 +143,7 @@ echo " ";
 echo "Getting build information...";
 cd split_img;
 imgtype=`cat *-imgtype`;
-if [ "$imgtype" != "KRNL" ]; then
+if [ "$imgtype" != "KRNL" -a -f *-zImage ]; then
   kernel=`ls *-zImage`;                 echo "kernel = $kernel";
   kernel="split_img/$kernel";
 fi;
@@ -273,8 +279,12 @@ case $imgtype in
     "$bin/$arch/mboot" -d split_img/.temp -f $outname;
   ;;
   U-Boot)
-    test "$type" == "Multi" && uramdisk=(:"$ramdisk");
-    "$bin/$arch/mkimage" -A $uarch -O $os -T $type -C $comp -a $addr -e $ep -n "$name" -d "$kernel""${uramdisk[@]}" $outname >/dev/null;
+    part0="$kernel";
+    case $type in
+      Multi) part1=(:"$ramdisk");;
+      RAMDisk) part0="$ramdisk";;
+    esac;
+    "$bin/$arch/mkimage" -A $uarch -O $os -T $type -C $comp -a $addr -e $ep -n "$name" -d "$part0""${part1[@]}" $outname >/dev/null;
   ;;
   *) echo " "; echo "Unsupported format."; abort; exit 1;;
 esac;
@@ -299,7 +309,7 @@ if [ -f split_img/*-sigtype ]; then
   test ! "$avbkey" && avbkey="$bin/avb/verity";
   echo " ";
   case $sigtype in
-    AVB) java -jar "$bin/BootSignature.jar" /$avbtype unsigned-new.img "$avbkey.pk8" "$avbkey.x509."* image-new.img 2>/dev/null;;
+    AVBv1) java -jar "$bin/BootSignature.jar" /$avbtype unsigned-new.img "$avbkey.pk8" "$avbkey.x509."* image-new.img 2>/dev/null;;
     BLOB)
       awk 'BEGIN { printf "-SIGNED-BY-SIGNBLOB-\00\00\00\00\00\00\00\00" }' > image-new.img;
       "$bin/$arch/blobpack" tempblob $blobtype unsigned-new.img >/dev/null;

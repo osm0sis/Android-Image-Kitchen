@@ -21,9 +21,9 @@
 0		string		DHTB\x01\x00\x00	DHTB signing
 
 # Sony SIN Packaging/Signature
-0		string		\x01\x00\x00\x00	SIN signing v1
-0		string		\x02\x00\x00\x00	SIN signing v2
-0		string		\x03SIN				SIN signing v3
+0		string		\x01\x00\x00\x00	SINv1 signing
+0		string		\x02\x00\x00\x00	SINv2 signing
+0		string		\x03SIN				SINv3 signing
 
 # Google Pixel/Nexus/AOSP Standard
 # [test "x" as workaround to odd file/magic behavior not allowing search here]
@@ -74,11 +74,18 @@
 0		string		QCDT				QCDT header
 !:strength / 20
 
-# Google Android Verified Boot Signature
+# Google Android Verified Boot 1.0 Signature
 # [for detection with the tail of the boot image]
-0		search		\x02\x01\x01\x30\x82	AVB signing v1 footer
+0		search		\x02\x01\x01\x30\x82	AVBv1 signing footer
 >0		search		/boot					\b, boot type
 >0		search		/recovery				\b, recovery type
+!:strength / 20
+
+# Google Android Verified Boot 2.0 Signature
+# [for detection with the tail of the boot image]
+# [test "x" as workaround to odd file/magic behavior not allowing search here]
+0		string		x
+>0		search		AVBf					AVBv2 signing footer
 !:strength / 20
 
 # LG Bump

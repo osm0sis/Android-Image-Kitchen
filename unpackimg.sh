@@ -117,7 +117,7 @@ if [ "$(echo $imgtest | awk '{ print $2 }' | cut -d, -f1)" = "signing" ]; then
       dd bs=262144 count=1 conv=notrunc if="$img" of="$file-master_boot.key" 2>/dev/null;
       dd bs=262144 skip=1 conv=notrunc if="$img" of="$file" 2>/dev/null;
     ;;
-    SIN)
+    SIN*)
       "$bin/$arch/kernel_dump" . "$img" >/dev/null;
       mv -f "$file."* "$file";
       rm -rf "$file-sigtype";
@@ -163,14 +163,21 @@ if [ "$(echo $imgtest | awk '{ print $3 }')" = "LOKI" ]; then
   img="$file";
 fi;
 
-tailtest="$(tail -n50 "$img" 2>/dev/null | file -m "$bin/androidbootimg.magic" - 2>/dev/null | cut -d: -f2-)";
+tailtest="$(dd if="$img" iflag=skip_bytes skip=$(($(wc -c < "$img") - 8192)) bs=8192 count=1 2>/dev/null | file -m $bin/androidbootimg.magic - 2>/dev/null | cut -d: -f2-)";
+case $tailtest in
+  *data) tailtest="$(tail -n50 "$img" | file -m "$bin/androidbootimg.magic" - 2>/dev/null | cut -d: -f2-)";;
+esac;
 tailtype="$(echo $tailtest | awk '{ print $1 }')";
 case $tailtype in
-  AVB)
+  AVB*)
     echo "Signature with \"$tailtype\" type detected.";
     echo " ";
-    echo $tailtype > "$file-sigtype";
-    echo $tailtest | awk '{ print $5 }' > "$file-avbtype";
+    case $tailtype in
+      *v1)
+        echo $tailtype > "$file-sigtype";
+        echo $tailtest | awk '{ print $4 }' > "$file-avbtype";
+      ;;
+    esac;
   ;;
   Bump|SEAndroid)
     echo "Footer with \"$tailtype\" type detected.";
@@ -205,7 +212,7 @@ case $imgtype in
     "$bin/$arch/mboot" -u -f "$img";
     test ! $? -eq "0" && error=1;
     for i in bootstub cmdline.txt hdr kernel parameter ramdisk.cpio.gz sig; do
-      $bb mv -f $i "$file-$(basename $i .txt | sed -e 's/hdr/header/' -e 's/kernel/zImage/')" 2>/dev/null || true;
+      mv -f $i "$file-$(basename $i .txt | sed -e 's/hdr/header/' -e 's/kernel/zImage/')" 2>/dev/null || true;
     done;
   ;;
   U-Boot)
@@ -221,11 +228,11 @@ case $imgtype in
     rm -rf "$file-header";
     "$bin/$arch/dumpimage" -p 0 -o "$file-zImage" "$img";
     test ! $? -eq "0" && error=1;
-    if [ "$(cat "$file-type")" = "Multi" ]; then
-      "$bin/$arch/dumpimage" -p 1 -o "$file-ramdisk.cpio.gz" "$img";
-    else
-      touch "$file-ramdisk.cpio.gz";
-    fi;
+    case $(cat "$file-type") in
+      Multi) "$bin/$arch/dumpimage" -p 1 -o "$file-ramdisk.cpio.gz" "$img";;
+      RAMDisk) mv -f "$file-zImage" "$file-ramdisk.cpio.gz";;
+      *) touch "$file-ramdisk.cpio.gz";;
+    esac;
   ;;
 esac;
 if [ ! $? -eq "0" -o "$error" ]; then
