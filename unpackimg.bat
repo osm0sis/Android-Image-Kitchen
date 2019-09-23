@@ -59,6 +59,7 @@ if errorlevel == 1 call "%aik%\cleanup.bat" %local% >nul & goto error
 icacls ramdisk /inheritance:d >nul 2>&1
 icacls ramdisk /remove:g "NT AUTHORITY\Authenticated Users" >nul 2>&1
 icacls ramdisk /remove:g "BUILTIN\Users" >nul 2>&1
+icacls ramdisk /grant %userdomain%\%username%:(OI)(CI)(F) >nul 2>&1
 
 cd split_img
 "%bin%"\file -m "%bin%\androidbootimg.magic" "%file%" 2>nul | "%bin%"\cut -d: -f2- | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f3 | "%bin%"\cut -d, -f1 > "%~nx1-imgtype"
@@ -87,6 +88,9 @@ if "%sigtype%" == "NOOKTAB" (
   "%bin%"\dd bs=262144 skip=1 conv=notrunc if="%file%" of="%~nx1" 2>nul
   set "file=%~nx1"
 )
+if "%sigtype%" == "SINv1" set "sigtype=SIN"
+if "%sigtype%" == "SINv2" set "sigtype=SIN"
+if "%sigtype%" == "SINv3" set "sigtype=SIN"
 if "%sigtype%" == "SIN" (
   "%bin%"\kernel_dump . "%file%" >nul
   move /y "%~nx1."* "%~nx1" >nul 2>&1
@@ -142,14 +146,21 @@ if "%lokitest%" == "LOKI" (
   del "%~nx1-lokitype"
 )
 
-"%bin%"\tail -n50 "%file%" 2>nul | "%bin%"\file -m "%bin%\androidbootimg.magic" - 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-tailtype"
+for %%i in ("%file%") do @set /a "tailoffset=%%~z%i - 8192"
+"%bin%"\dd if="%file%" iflag=skip_bytes skip=%tailoffset% bs=8192 count=1 2>nul | "%bin%"\file -m "%bin%\androidbootimg.magic" - 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-tailtype"
 for /f "delims=" %%a in ('type "%~nx1-tailtype"') do @set "tailtype=%%a"
-if not "%tailtype%" == "AVB" if not "%tailtype%" == "Bump" if not "%tailtype%" == "SEAndroid" del "%~nx1-tailtype"
-if "%tailtype%" == "AVB" (
-  "%bin%"\tail -n50 "%file%" 2>nul | "%bin%"\file -m "%bin%\androidbootimg.magic" - 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f6 > "%~nx1-avbtype"
-  echo Signature with "%tailtype%" type detected. & echo.
+if "%tailtype%" == "data" (
+  "%bin%"\tail -n50 "%file%" 2>nul | "%bin%"\file -m "%bin%\androidbootimg.magic" - 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-tailtype"
+  for /f "delims=" %%a in ('type "%~nx1-tailtype"') do @set "tailtype=%%a"
+)
+if not "%tailtype%" == "AVBv1" if not "%tailtype%" == "Bump" if not "%tailtype%" == "SEAndroid" del "%~nx1-tailtype"
+if not "%tailtype%" == "AVBv1" if not "%tailtype%" == "AVBv2" goto skipavb
+if "%tailtype%" == "AVBv1" (
+  "%bin%"\tail -n50 "%file%" 2>nul | "%bin%"\file -m "%bin%\androidbootimg.magic" - 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f5 > "%~nx1-avbtype"
   move /y "%~nx1-tailtype" "%~nx1-sigtype" >nul
 )
+echo Signature with "%tailtype%" type detected. & echo.
+:skipavb
 if exist "*-tailtype" echo Footer with "%tailtype%" type detected. & echo.
 
 if not "%imgtype%" == "U-Boot" goto skiptrim
@@ -205,6 +216,8 @@ if "%imgtype%" == "U-Boot" (
   for /f "delims=" %%a in ('type "%~nx1-type"') do (
     if "%%a" == "Multi" (
       "%bin%"\dumpimage -p 1 -o "%~nx1-ramdisk.cpio.gz" "%file%"
+    ) else if "%%a" == "RAMDisk" (
+      move /y "%~nx1-zImage" "%~nx1-ramdisk.cpio.gz" >nul 2>&1
     ) else (
       copy /y nul "%~nx1-ramdisk.cpio.gz" >nul
     )
