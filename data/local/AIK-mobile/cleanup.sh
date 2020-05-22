@@ -15,7 +15,7 @@ bin="$aik/bin";
 
 cd $aik;
 chmod -R 755 $bin $aik/*.sh;
-chmod 644 $bin/magic $bin/androidbootimg.magic $bin/BootSignature_Android.jar $bin/module.prop $bin/ramdisk.img $bin/avb/* $bin/chromeos/*;
+chmod 644 $bin/magic $bin/androidbootimg.magic $bin/boot_signer-dexed.jar $bin/module.prop $bin/ramdisk.img $bin/avb/* $bin/chromeos/*;
 
 $bin/remount.sh --umount-only 2>/dev/null;
 

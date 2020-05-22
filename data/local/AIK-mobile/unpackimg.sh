@@ -20,7 +20,7 @@ abort() { cd $aik; echo "Error!"; }
 cd $aik;
 bb=$bin/busybox;
 chmod -R 755 $bin *.sh;
-chmod 644 $bin/magic $bin/androidbootimg.magic $bin/BootSignature_Android.jar $bin/module.prop $bin/ramdisk.img $bin/avb/* $bin/chromeos/*;
+chmod 644 $bin/magic $bin/androidbootimg.magic $bin/boot_signer-dexed.jar $bin/module.prop $bin/ramdisk.img $bin/avb/* $bin/chromeos/*;
 
 if [ ! -f $bb ]; then
   bb=busybox;
@@ -66,6 +66,8 @@ cp -f $bin/ramdisk.img split_img/.aik-ramdisk.img;
 $bin/remount.sh --mount-only || return 1;
 
 cd split_img;
+filesize=$($bb wc -c < "$img");
+echo "$filesize" > "$file-origsize";
 imgtest="$($bin/file -m $bin/androidbootimg.magic "$img" 2>/dev/null | $bb cut -d: -f2-)";
 if [ "$(echo $imgtest | $bb awk '{ print $2 }' | $bb cut -d, -f1)" == "signing" ]; then
   echo $imgtest | $bb awk '{ print $1 }' > "$file-sigtype";
@@ -88,9 +90,9 @@ if [ "$(echo $imgtest | $bb awk '{ print $2 }' | $bb cut -d, -f1)" == "signing" 
       $bb dd bs=262144 skip=1 conv=notrunc if="$img" of="$file" 2>/dev/null;
     ;;
     SIN*)
-      $bin/kernel_dump . "$img" >/dev/null;
+      $bin/sony_dump . "$img" >/dev/null;
       $bb mv -f "$file."* "$file";
-      rm -rf "$file-sigtype";
+      rm -f "$file-sigtype";
     ;;
   esac;
   img="$file";
@@ -121,14 +123,27 @@ case $imgtype in
   ;;
 esac;
 
-if [ "$(echo $imgtest | $bb awk '{ print $3 }')" == "LOKI" ]; then
-  echo $imgtest | $bb awk '{ print $5 }' | $bb cut -d\( -f2 | $bb cut -d\) -f1 > "$file-lokitype";
-  lokitype=$(cat "$file-lokitype");
-  echo "Loki patch with \"$lokitype\" type detected, reverting...\n";
-  echo "Warning: A dump of your device's aboot.img is required to re-Loki!\n";
-  $bin/loki_tool unlok "$img" "$file" >/dev/null;
-  img="$file";
-fi;
+case $(echo $imgtest | $bb awk '{ print $3 }') in
+  LOKI)
+    echo $imgtest | $bb awk '{ print $5 }' | $bb cut -d\( -f2 | $bb cut -d\) -f1 > "$file-lokitype";
+    lokitype=$(cat "$file-lokitype");
+    echo "Loki patch with \"$lokitype\" type detected, reverting...\n";
+    echo "Warning: A dump of your device's aboot.img is required to re-Loki!\n";
+    $bin/loki_tool unlok "$img" "$file" >/dev/null;
+    img="$file";
+  ;;
+  AMONET)
+    echo "Amonet patch detected, reverting...\n";
+    $bb dd bs=2048 count=1 conv=notrunc if="$img" of="$file-microloader.bin" 2>/dev/null;
+    $bb dd bs=1024 skip=1 conv=notrunc if="$file-microloader.bin" of="$file-head" 2>/dev/null;
+    $bb truncate -s 1024 "$file-microloader.bin";
+    $bb truncate -s 2048 "$file-head";
+    $bb dd bs=2048 skip=1 conv=notrunc if="$img" of="$file-tail" 2>/dev/null;
+    cat "$file-head" "$file-tail" > "$file";
+    rm -f "$file-head" "$file-tail";
+    img="$file";
+  ;;
+esac;
 
 tailtest="$($bb dd if="$img" iflag=skip_bytes skip=$(($(wc -c < "$img") - 8192)) bs=8192 count=1 2>/dev/null | $bin/file -m $bin/androidbootimg.magic - 2>/dev/null | $bb cut -d: -f2-)";
 case $tailtest in
@@ -161,7 +176,7 @@ esac;
 
 if [ "$imgtype" == "U-Boot" ]; then
   imgsize=$(($($bb printf '%d\n' 0x$($bb hexdump -n 4 -s 12 -e '16/1 "%02x""\n"' "$img")) + 64));
-  if [ "$($bb wc -c < "$img")" != "$imgsize" ]; then
+  if [ "$filesize" != "$imgsize" ]; then
     echo "Trimming...\n";
     $bb dd bs=$imgsize count=1 conv=notrunc if="$img" of="$file" 2>/dev/null;
     img="$file";
@@ -197,7 +212,7 @@ case $imgtype in
     $bb grep "Type:" "$file-header" | $bb cut -d\( -f2 | $bb cut -d\) -f1 | $bb cut -d" " -f1 | $bb cut -d- -f1 > "$file-comp";
     $bb grep "Address:" "$file-header" | $bb cut -c15- > "$file-addr";
     $bb grep "Point:" "$file-header" | $bb cut -c15- > "$file-ep";
-    rm -rf "$file-header";
+    rm -f "$file-header";
     $bin/dumpimage -p 0 -o "$file-zImage" "$img";
     test $? != 0 && error=1;
     case $(cat "$file-type") in
@@ -212,11 +227,6 @@ if [ $? != 0 -o "$error" ]; then
   cleanup;
   abort;
   return 1;
-fi;
-
-if [ "$imgtype" == "AOSP" ] && [ "$(cat "$file-hash")" == "unknown" ]; then
-  echo "\nWarning: \"unknown\" hash type detected; assuming \"sha1\" type!";
-  echo "sha1" > "$file-hash";
 fi;
 
 if [ "$($bin/file -m $bin/androidbootimg.magic *-zImage 2>/dev/null | $bb cut -d: -f2 | $bb awk '{ print $1 }')" == "MTK" ]; then
@@ -251,7 +261,7 @@ if [ -f *-dt ]; then
   if [ "$imgtype" == "ELF" ]; then
     case $dttest in
       QCDT|ELF) ;;
-      *) echo "\nNon-QC DT found, packing zImage and appending...";
+      *) echo "\nNon-QC DTB found, packing zImage and appending...";
          $bb gzip "$file-zImage";
          $bb mv -f "$file-zImage.gz" "$file-zImage";
          cat "$file-dt" >> "$file-zImage";
@@ -271,6 +281,7 @@ case $ramdiskcomp in
   lzma) unpackcmd="$bin/xz -dc";;
   bzip2) compext=bz2;;
   lz4) unpackcmd="$bin/lz4 -dcq";;
+  lz4-l) unpackcmd="$bin/lz4 -dcq"; compext=lz4;;
   cpio) unpackcmd="cat"; compext="";;
   empty) compext=empty;;
   *) compext="";;

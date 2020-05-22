@@ -17,7 +17,7 @@ bin="$aik/bin";
 
 bb=$bin/busybox;
 chmod -R 755 $bin $aik/*.sh;
-chmod 644 $bin/magic $bin/androidbootimg.magic $bin/BootSignature_Android.jar $bin/module.prop $bin/ramdisk.img $bin/avb/* $bin/chromeos/*;
+chmod 644 $bin/magic $bin/androidbootimg.magic $bin/boot_signer-dexed.jar $bin/module.prop $bin/ramdisk.img $bin/avb/* $bin/chromeos/*;
 
 if [ ! -f $bb ]; then
   bb=busybox;
@@ -29,15 +29,20 @@ $bb ps | $bb grep -v grep | $bb grep -q zygote && su="su -mm" || su=sh;
   $bb mount | $bb grep -q " $aik/ramdisk " && return 0;
   $su -c "$bb mount -t ext4 -o rw,noatime $aik/split_img/.aik-ramdisk.img $aik/ramdisk" 2>/dev/null;
   if [ $? != 0 ]; then
+    test -e /dev/block/loop1 && minorx=$(ls -l /dev/block/loop1 | $bb awk '{ print $6 }') || minorx=1;
     i=0;
-    while [ $i -lt 16 ]; do
+    while [ $i -lt 64 ]; do
       loop=/dev/block/loop$i;
-      $bb mknod $loop b 7 $i 2>/dev/null;
+      $bb mknod $loop b 7 $((i * minorx)) 2>/dev/null;
       $bb losetup $loop $aik/split_img/.aik-ramdisk.img 2>/dev/null;
       $bb losetup $loop | $bb grep -q .aik-ramdisk.img && break;
       i=$((i + 1));
     done;
-    $su -c "$bb mount -t ext4 -o loop,noatime $loop $aik/ramdisk" || return 1;
+    $su -c "$bb mount -t ext4 -o loop,noatime $loop $aik/ramdisk";
+    if [ $? != 0 ]; then
+      $bb losetup -d $loop 2>/dev/null;
+      return 1;
+    fi;
   fi;
 }
 
