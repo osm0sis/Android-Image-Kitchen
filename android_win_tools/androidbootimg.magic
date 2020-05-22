@@ -32,8 +32,11 @@
 >>36	string		\x00\x00\x00\x02	\b, PXA variant (020)
 >>36	string		\x00\x00\x80\x02	\b, PXA variant (028)
 >>36	string		\x00\x00\x00\x03	\b, PXA variant (030)
->>1024	search		LOKI\x01			\b, LOKI header (recovery)
->>1024	search		LOKI\x00			\b, LOKI header (boot)
+>>96	search		microloader
+>>>1024	string		ANDROID!			\b, AMONET header
+>>1024	string		LOKI				\b, LOKI header
+>>>1028	string		\x00				\b (boot)
+>>>1028	string		\x01				\b (recovery)
 >>2048	search		\x88\x16\x88\x58	\b, MTK headers
 !:strength * 3
 

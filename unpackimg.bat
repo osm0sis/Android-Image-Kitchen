@@ -62,6 +62,8 @@ icacls ramdisk /remove:g "BUILTIN\Users" >nul 2>&1
 icacls ramdisk /grant %userdomain%\%username%:(OI)(CI)(F) >nul 2>&1
 
 cd split_img
+for /f "usebackq" %%a in ('%file%') do @set "filesize=%%~za"
+echo %filesize%>"%~nx1-origsize"
 "%bin%"\file -m "%bin%\androidbootimg.magic" "%file%" 2>nul | "%bin%"\cut -d: -f2- | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f3 | "%bin%"\cut -d, -f1 > "%~nx1-imgtype"
 for /f "delims=" %%a in ('type "%~nx1-imgtype"') do @set "imgtest=%%a"
 if "%imgtest%" == "signing" (
@@ -92,7 +94,7 @@ if "%sigtype%" == "SINv1" set "sigtype=SIN"
 if "%sigtype%" == "SINv2" set "sigtype=SIN"
 if "%sigtype%" == "SINv3" set "sigtype=SIN"
 if "%sigtype%" == "SIN" (
-  "%bin%"\kernel_dump . "%file%" >nul
+  "%bin%"\sony_dump . "%file%" >nul
   move /y "%~nx1."* "%~nx1" >nul 2>&1
   set "file=%~nx1"
   del "%~nx1-sigtype"
@@ -132,9 +134,10 @@ if not defined supported (
   goto error
 )
 
-"%bin%"\file -m "%bin%\androidbootimg.magic" "%file%" 2>nul | "%bin%"\cut -d: -f2- | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f4 > "%~nx1-lokitype"
-for /f "delims=" %%a in ('type "%~nx1-lokitype"') do @set "lokitest=%%a"
-if "%lokitest%" == "LOKI" (
+"%bin%"\file -m "%bin%\androidbootimg.magic" "%file%" 2>nul | "%bin%"\cut -d: -f2- | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f4 > "%~nx1-aosphacktype"
+for /f "delims=" %%a in ('type "%~nx1-aosphacktype"') do @set "aosphacktest=%%a"
+if "%aosphacktest%" == "LOKI" (
+  move /y "%~nx1-aosphacktype" "%~nx1-lokitype" >nul
   "%bin%"\file -m "%bin%\androidbootimg.magic" "%file%" 2>nul | "%bin%"\cut -d: -f2- | "%bin%"\cut -d: -f2 | "%bin%"\cut -d( -f2 | "%bin%"\cut -d^) -f1 > "%~nx1-lokitype"
   for /f "delims=" %%a in ('type "%~nx1-lokitype"') do @echo Loki patch with "%%a" type detected, reverting . . .
   echo.
@@ -142,8 +145,19 @@ if "%lokitest%" == "LOKI" (
   "%bin%"\loki_tool unlok "%file%" "%~nx1" >nul
   echo.
   set "file=%~nx1"
+) else if "%aosphacktest%" == "AMONET" (
+  echo Amonet patch detected, reverting . . .
+  echo.
+  "%bin%"\dd bs=2048 count=1 conv=notrunc if="%file%" of="%~nx1-microloader.bin" 2>nul
+  "%bin%"\dd bs=1024 skip=1 conv=notrunc if="%~nx1-microloader.bin" of="%~nx1-head" 2>nul
+  "%bin%"\truncate -s 1024 "%~nx1-microloader.bin"
+  "%bin%"\truncate -s 2048 "%~nx1-head"
+  "%bin%"\dd bs=2048 skip=1 conv=notrunc if="%file%" of="%~nx1-tail" 2>nul
+  copy /b "%~nx1-head"+"%~nx1-tail" "%~nx1" >nul
+  set "file=%~nx1"
+  del "%~nx1-aosphacktype" "%~nx1-head" "%~nx1-tail"
 ) else (
-  del "%~nx1-lokitype"
+  del "%~nx1-aosphacktype"
 )
 
 for %%i in ("%file%") do @set /a "tailoffset=%%~z%i - 8192"
@@ -167,7 +181,6 @@ if not "%imgtype%" == "U-Boot" goto skiptrim
 "%bin%"\hexdump -n 4 -s 12 -e '16/1 "%%02x""\n"' "%file%" > "%~nx1-sizetest"
 for /f "delims=" %%a in ('type "%~nx1-sizetest"') do @"%bin%"\printf '%%d\n' 0x%%a > "%~nx1-sizetest"
 for /f "delims=" %%a in ('type "%~nx1-sizetest"') do @set /a "imgsize = %%a + 64"
-for /f "usebackq" %%a in ('%file%') do @set "filesize=%%~za"
 if not "%imgsize%" == "%filesize%" (
   echo Trimming . . .
   echo.
@@ -231,12 +244,6 @@ if "%error%" == "1" (
 )
 echo.
 
-if "%imgtype%" == "AOSP" (
-  for /f "delims=" %%a in ('type "%~nx1-hash"') do (
-    if "%%a" == "unknown" echo sha1>"%~nx1-hash" & echo Warning: "unknown" hash type detected; assuming "sha1" type! & echo.
-  )
-)
-
 "%bin%"\file -m "%bin%\androidbootimg.magic" *-zImage 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-mtktest"
 for /f "delims=" %%a in ('type "%~nx1-mtktest"') do @set "mtktest=%%a"
 if "%mtktest%" == "MTK" (
@@ -272,7 +279,7 @@ if exist "*-dt" (
   "%bin%"\file -m "%bin%\androidbootimg.magic" *-dt 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-dttype"
   for /f "delims=" %%a in ('type "%~nx1-dttype"') do (
     if "%imgtype%" == "ELF" if not "%%a" == "QCDT" if not "%%a" == "ELF" (
-      echo Non-QC DT found, packing zImage and appending . . .
+      echo Non-QC DTB found, packing zImage and appending . . .
       echo.
       "%bin%"\gzip --no-name -9 "%~nx1-zImage"
       copy /b "%~nx1-zImage.gz"+"%~nx1-dt" "%~nx1-zImage" >nul
@@ -290,6 +297,7 @@ if "%ramdiskcomp%" == "lzop" set "compext=lzo"
 if "%ramdiskcomp%" == "lzma" set "unpackcmd=xz -dc"
 if "%ramdiskcomp%" == "bzip2" set "compext=bz2"
 if "%ramdiskcomp%" == "lz4" set "unpackcmd=lz4 -dcq"
+if "%ramdiskcomp%" == "lz4-l" set "unpackcmd=lz4 -dcq" & set "compext=lz4"
 if "%ramdiskcomp%" == "cpio" set "unpackcmd=cat" & set "compext="
 if "%ramdiskcomp%" == "empty" set "compext=empty"
 if defined compext set "compext=.%compext%"
