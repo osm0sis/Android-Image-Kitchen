@@ -1,7 +1,7 @@
 #------------------------------------------------------------------------------
 # Slimmed down magic file for archives only
 #------------------------------------------------------------------------------
-# $File: archive,v 1.129 2019/05/09 18:58:02 christos Exp $
+# $File: archive,v 1.133 2019/11/15 21:03:14 christos Exp $
 # archive:  file(1) magic for archive formats (see also "msdos" for self-
 #           extracting compressed archives)
 #
@@ -263,7 +263,7 @@
 # NL terminated original package length
 >>>>>&1	string		x		\b, unsplitted size %s
 # NL terminated part length
->>>>>>&1	string	x		\b, part lenght %s
+>>>>>>&1	string	x		\b, part length %s
 # NL terminated package part like n/m
 >>>>>>>&1	string	x		\b, part %s
 # NL terminated package architecture like armhf since dpkg 1.16.1 or later
@@ -439,6 +439,34 @@
 # skip keyword with low entropy
 >12	default		x	TTComp archive, binary, 4K dictionary
 # (version 5.25) labeled the above entry as "TTComp archive data"
+# From:		Joerg Jenderek
+# URL:		https://wiki.68kmla.org/DiskCopy_4.2_format_specification
+# reference:	http://nulib.com/library/FTN.e00005.htm
+0x52	ubeshort	0x0100
+# test for disk size equal or above 400k
+>0x40	ubelong		>409599	Apple DiskCopy 4.2 image
+#!:mime	application/octet-stream
+!:apple	dCpydImg
+#!:ext	image/dc42
+# image pascal name padded with NULs like Microsoft Mail
+>>00	pstring/B	x	%s
+# data size in bytes like 409600
+>>0x40	ubelong		x	\b, %u bytes
+# tag size in bytes
+>>0x44	ubelong		>0	\b, 0x%x tag size
+# data checksum
+#>>0x48	ubelong		x	\b, 0x%x checksum
+# tag checksum
+#>>0x4c	ubelong		x	\b, 0x%x tag checksum
+# disk encoding
+>>0x50	ubyte		0	\b, GCR CLV ssdd (400k)
+>>0x50	ubyte		1	\b, GCR CLV dsdd (800k)
+>>0x50	ubyte		2	\b, MFM CAV dsdd (720k)
+>>0x50	ubyte		3	\b, MFM CAV dshd (1440k)
+>>0x50	ubyte		>3	\b, 0x%x encoding
+# format byte
+>>0x51	ubyte		x	\b, 0x%x format
+#>>0x54	ubequad		x	\b, data 0x%16.16llx
 # ESP, could this conflict with Easy Software Products' (e.g.ESP ghostscript) documentation?
 0	string	ESP ESP archive data
 # ZPack
@@ -966,17 +994,31 @@
 >>50	string	epub+zip	EPUB document
 !:mime application/epub+zip
 
+# From:	Joerg Jenderek
+# URL:	http://en.wikipedia.org/wiki/CorelDRAW
+# NOTE:	version; til 2 WL-based; from 3 til 13 by ./riff; from 14 zip based
+>>50	string	x-vnd.corel.	 Corel
+>>>62	string	draw.document+zip	Draw drawing, version 14-16
+!:mime	application/x-vnd.corel.draw.document+zip
+#!:ext	cdr
+>>>62	string	draw.template+zip	Draw template, version 14-16
+!:mime	application/x-vnd.corel.draw.template+zip
+#!:ext	cdrt
+>>>62	string	zcf.draw.document+zip	Draw drawing, version 17-21
+!:mime	application/x-vnd.corel.zcf.draw.document+zip
+#!:ext	cdr
+>>>62	string	zcf.draw.template+zip	Draw template, version 17-21
+!:mime	application/x-vnd.corel.zcf.draw.template+zip
+#!:ext	cdt/cdrt
+
 #  Catch other ZIP-with-mimetype formats
 #	In a ZIP file, the bytes immediately after a member's contents are
 #	always "PK". The 2 regex rules here print the "mimetype" member's
 #	contents up to the first 'P'. Luckily, most MIME types don't contain
 #	any capital 'P's. This is a kludge.
 #    (mimetype contains "application/<OTHER>")
->>50		string	!epub+zip
->>>50		string	!vnd.oasis.opendocument.
->>>>50		string	!vnd.sun.xml.
->>>>>50		string	!vnd.kde.
->>>>>>38	regex	[!-OQ-~]+		Zip data (MIME type "%s"?)
+>>50		default	x			Zip data
+>>>38		regex	[!-OQ-~]+		(MIME type "%s"?)
 !:mime	application/zip
 #    (mimetype contents other than "application/*")
 >26		string	\x8\0\0\0mimetype
@@ -1066,6 +1108,10 @@
 !:mime	application/x-bittorrent
 # Durval Menezes, <jmgthbfile at durval dot com>
 0	string	d13:announce-list	BitTorrent file
+!:mime	application/x-bittorrent
+0	string	d7:comment	BitTorrent file
+!:mime	application/x-bittorrent
+0	string	d4:info		BitTorrent file
 !:mime	application/x-bittorrent
 
 # Atari MSA archive - Teemu Hukkanen <tjhukkan@iki.fi>
@@ -1306,7 +1352,7 @@
 
 
 #------------------------------------------------------------------------------
-# $File: compress,v 1.75 2019/04/19 00:42:27 christos Exp $
+# $File: compress,v 1.77 2019/10/08 20:25:13 christos Exp $
 # compress:  file(1) magic for pure-compression formats (no archives)
 #
 # compress, gzip, pack, compact, huf, squeeze, crunch, freeze, yabba, etc.
@@ -1365,10 +1411,10 @@
 >>>13	string		09			\b, version 9
 # other gzipped binary like gzipped tar, VirtualBox extension package,...
 >>10	default		x		gzip compressed data
+!:mime	application/gzip
 # size of the original (uncompressed) input data modulo 2^32
 >>>-4	ulelong		x		\b, original size modulo 2^32 %u
 # gzipped TAR or VirtualBox extension package
-!:mime	application/gzip
 #!:mime	application/x-compressed-tar
 #!:mime	application/x-virtualbox-vbox-extpack
 # https://www.w3.org/TR/SVG/mimereg.html
@@ -1580,7 +1626,7 @@
 # Added by osm0sis@xda-developers.com
 0 	lelong		0x184c2103	lz4 compressed data (v1.0-v1.3)
 !:mime	application/x-lz4
-0	lelong		0x184c2102	lz4 compressed data (v0.1-v0.9)
+0	lelong		0x184c2102	lz4-l compressed data (v0.1-v0.9)
 !:mime	application/x-lz4
 
 # Zstandard/LZ4 skippable frames
@@ -1590,7 +1636,7 @@
 
 # https://github.com/facebook/zstd/blob/dev/zstd_compression_format.md
 0  lelong    0xEC30A437  Zstandard dictionary
-!:mime  application/x-zstd-dictionary
+!:mime  application/x-std-dictionary
 >4 lelong    x           (ID %u)
 
 # AFX compressed files (Wolfram Kleff)
@@ -1657,7 +1703,7 @@
 0	string	bvx2	lzfse compressed, compressed tables
 
 #------------------------------------------------------------
-# $File: android,v 1.12 2019/04/19 00:42:27 christos Exp $
+# $File: android,v 1.16 2019/11/15 21:03:14 christos Exp $
 # Various android related magic entries
 #------------------------------------------------------------
 
@@ -1675,8 +1721,11 @@
 # Android bootimg format
 # From https://android.googlesource.com/\
 # platform/system/core/+/master/mkbootimg/bootimg.h
+# https://github.com/djrbliss/loki/blob/master/loki.h#L43
 0		string	ANDROID!	Android bootimg
->1024	string	LOKI\01		\b, LOKI'd
+>1024	string	LOKI		\b, LOKI'd
+>>1028	lelong	0			\b (boot)
+>>1028	lelong	1			\b (recovery)
 >8		lelong	>0			\b, kernel
 >>12	lelong	>0			\b (0x%x)
 >16		lelong	>0			\b, ramdisk
@@ -1702,3 +1751,10 @@
 # RES_XML_TYPE = 0x0003 followed by the size of the header (ResXMLTree_header),
 # which is 8 bytes (2 bytes type + 2 bytes header size + 4 bytes size).
 0	lelong	0x00080003	Android binary XML
+
+# Android cryptfs footer
+# From https://android.googlesource.com/\
+# platform/system/vold/+/refs/heads/master/cryptfs.h
+0	lelong	0xd0b5b1c4	Android cryptfs footer
+>4	leshort	x	\b, version: %d
+>6	leshort	x	\b.%d

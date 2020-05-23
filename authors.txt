@@ -32,7 +32,7 @@ futility:
 https://github.com/jcadduono/platform_external_vboot_reference (initial source)
 https://github.com/osm0sis/futility (patches)
 
-BootSignature.jar (requires JRE 8+):
+boot_signer.jar (requires JRE 8+):
 https://forum.xda-developers.com/android/software-hacking/signing-boot-images-android-verified-t3600606
 
 blobpack, blobunpack:
@@ -45,7 +45,7 @@ https://github.com/osm0sis/dhtbsign (patches)
 rkcrc:
 https://github.com/rockchip-linux/rkflashtool
 
-kernel_dump:
+sony_dump:
 https://forum.xda-developers.com/crossdevice-dev/sony/tool-unpack-format-sony-kernel-image-t3530077
 
 lz4:
@@ -54,21 +54,22 @@ https://lz4.github.io/lz4/
 magic:
 https://www.darwinsys.com/file/
 
-cpio, dd, file, lzop, tail, xz;
+cpio, dd, file, lzop, tail, truncate, xz;
 libiconv.2, libintl.8, liblzma.5, liblzo2.2, libmagic.1 (macOS):
 https://www.macports.org/
 
 gzip, bzip2, lzop, xz;
-awk, basename, bash, cpio, cut, dd, dirname, env, file, find, grep, hexdump, printf, sed, stat, sudo, tail, wc (Linux):
+awk, basename, bash, cpio, cut, dd, dirname, env, file, find, grep, hexdump, printf, rev, sed, stat, sudo, tail, truncate, wc (Linux):
 (required system packages/commands)
 
 androidbootimg.magic:
-osm0sis@xda-developers
+osm0sis @ xda-developers
 
 shell scripts:
-osm0sis@xda-developers (scripting)
-Peteragent5, alansj & iridaki@xda-developers (general method)
-SuperR. & tobias.waldvogel@xda-developers (kernel.elf to boot.img general method)
-_that & rayman@xda-developers (boot.blob general method)
-Chainfire@xda-developers (ChromeOS and SEAndroid general methods)
-cybojenix@xda-developers (Bump general method)
+osm0sis @ xda-developers (scripting)
+Peteragent5, alansj & iridaki @ xda-developers (general method)
+SuperR. & tobias.waldvogel @ xda-developers (kernel.elf to boot.img general method)
+_that & rayman @ xda-developers (boot.blob general method)
+Chainfire @ xda-developers (ChromeOS and SEAndroid general methods)
+cybojenix @ xda-developers (Bump general method)
+xyz` & k4y0z @ xda-developers (amonet general method)
