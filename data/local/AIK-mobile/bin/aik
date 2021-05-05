@@ -9,7 +9,7 @@ case $1 in
   --restore)
     # fix shortcut script
     imgmnt=$(su -c "(ls -d /magisk || ls -d /sbin/.core/img || ls -d /sbin/.magisk/img || ls -d /data/adb/modules) 2>/dev/null");
-    test "$imgmnt" && rbmsg=' \(reboot required\)';
+    [ "$imgmnt" ] && rbmsg=' \(reboot required\)';
     # work around Magisk Canary 1930x issue where every second su -c fails
     su -c exit 2>/dev/null;
     su -c " \

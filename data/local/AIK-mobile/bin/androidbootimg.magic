@@ -40,11 +40,18 @@
 >>2048	search		\x88\x16\x88\x58	\b, MTK headers
 !:strength * 3
 
+# Google Pixel/AOSP Vendor Standard
+# [test "x" as workaround to odd file/magic behavior not allowing search here]
+0		string		x
+>0		search		VNDRBOOT			AOSP_VNDR bootimg
+!:strength * 3
+
 # DENX U-Boot
 0		string		\x27\x05\x19\x56	U-Boot bootimg
 
 # Intel OSIP
 1000	search		\xFC\xFA\xBC\x00	OSIP bootimg (headerless)
+!:strength / 15
 0		string		$OS$\x00\x00\x01	OSIP bootimg
 >52		string		\x00\x00\x00\x00	\b, boot (signed)
 >52		string		\x01\x00\x00\x00	\b, boot (unsigned)

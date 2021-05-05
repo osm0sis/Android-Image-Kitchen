@@ -22,11 +22,10 @@ bb=$bin/busybox;
 chmod -R 755 $bin *.sh;
 chmod 644 $bin/magic $bin/androidbootimg.magic $bin/boot_signer-dexed.jar $bin/module.prop $bin/ramdisk.img $bin/avb/* $bin/chromeos/*;
 
-if [ ! -f $bb ]; then
-  bb=busybox;
-fi;
+[ ! -f $bb ] && bb=busybox;
 
-test -f "$cur/$1" && img="$cur/$1" || img="$1";
+img="$1";
+[ -f "$cur/$1" ] && img="$cur/$1";
 if [ ! "$img" ]; then
   $bb ls *.elf *.img *.sin 2>/dev/null |& while IFS= read -r -p line; do
     case $line in
@@ -100,7 +99,7 @@ fi;
 
 imgtest="$($bin/file -m $bin/androidbootimg.magic "$img" 2>/dev/null | $bb cut -d: -f2-)";
 if [ "$(echo $imgtest | $bb awk '{ print $2 }' | $bb cut -d, -f1)" == "bootimg" ]; then
-  test "$(echo $imgtest | $bb awk '{ print $3 }')" == "PXA" && typesuffix=-PXA;
+  [ "$(echo $imgtest | $bb awk '{ print $3 }')" == "PXA" ] && typesuffix=-PXA;
   echo "$(echo $imgtest | $bb awk '{ print $1 }')$typesuffix" > "$file-imgtype";
   imgtype=$(cat "$file-imgtype");
 else
@@ -185,7 +184,10 @@ fi;
 
 echo 'Splitting image to "split_img/"...';
 case $imgtype in
-  AOSP) $bin/unpackbootimg -i "$img";;
+  AOSP_VNDR) vendor=vendor_;;
+esac;
+case $imgtype in
+  AOSP|AOSP_VNDR) $bin/unpackbootimg -i "$img";;
   AOSP-PXA) $bin/pxa-unpackbootimg -i "$img";;
   ELF)
     mkdir elftool_out;
@@ -194,12 +196,12 @@ case $imgtype in
     rm -rf elftool_out;
     $bin/unpackelf -i "$img";
   ;;
-  KRNL) $bb dd bs=4096 skip=8 iflag=skip_bytes conv=notrunc if="$img" of="$file-ramdisk.cpio.gz" 2>&1 | $bb tail -n+3 | $bb cut -d" " -f1-2;;
+  KRNL) $bb dd bs=4096 skip=8 iflag=skip_bytes conv=notrunc if="$img" of="$file-ramdisk" 2>&1 | $bb tail -n+3 | $bb cut -d" " -f1-2;;
   OSIP)
     $bin/mboot -u -f "$img";
-    test $? != 0 && error=1;
+    [ $? != 0 ] && error=1;
     for i in bootstub cmdline.txt hdr kernel parameter ramdisk.cpio.gz sig; do
-      $bb mv -f $i "$file-$($bb basename $i .txt | $bb sed -e 's/hdr/header/' -e 's/kernel/zImage/')" 2>/dev/null || true;
+      $bb mv -f $i "$file-$($bb basename $i .txt | $bb sed -e 's/hdr/header/' -e 's/ramdisk.cpio.gz/ramdisk/')" 2>/dev/null || true;
     done;
   ;;
   U-Boot)
@@ -213,12 +215,12 @@ case $imgtype in
     $bb grep "Address:" "$file-header" | $bb cut -c15- > "$file-addr";
     $bb grep "Point:" "$file-header" | $bb cut -c15- > "$file-ep";
     rm -f "$file-header";
-    $bin/dumpimage -p 0 -o "$file-zImage" "$img";
-    test $? != 0 && error=1;
+    $bin/dumpimage -p 0 -o "$file-kernel" "$img";
+    [ $? != 0 ] && error=1;
     case $(cat "$file-type") in
-      Multi) $bin/dumpimage -p 1 -o "$file-ramdisk.cpio.gz" "$img";;
-      RAMDisk) $bb mv -f "$file-zImage" "$file-ramdisk.cpio.gz";;
-      *) touch "$file-ramdisk.cpio.gz";;
+      Multi) $bin/dumpimage -p 1 -o "$file-ramdisk" "$img";;
+      RAMDisk) $bb mv -f "$file-kernel" "$file-ramdisk";;
+      *) touch "$file-ramdisk";;
     esac;
   ;;
 esac;
@@ -229,22 +231,22 @@ if [ $? != 0 -o "$error" ]; then
   return 1;
 fi;
 
-if [ "$($bin/file -m $bin/androidbootimg.magic *-zImage 2>/dev/null | $bb cut -d: -f2 | $bb awk '{ print $1 }')" == "MTK" ]; then
+if [ -f *-kernel ] && [ "$($bin/file -m $bin/androidbootimg.magic *-kernel 2>/dev/null | $bb cut -d: -f2 | $bb awk '{ print $1 }')" == "MTK" ]; then
   mtk=1;
-  echo "\nMTK header found in zImage, removing...";
-  $bb dd bs=512 skip=1 conv=notrunc if="$file-zImage" of=tempzimg 2>/dev/null;
-  $bb mv -f tempzimg "$file-zImage";
+  echo "\nMTK header found in kernel, removing...";
+  $bb dd bs=512 skip=1 conv=notrunc if="$file-kernel" of=tempkern 2>/dev/null;
+  $bb mv -f tempkern "$file-kernel";
 fi;
-mtktest="$($bin/file -m $bin/androidbootimg.magic *-ramdisk*.gz 2>/dev/null | $bb cut -d: -f2-)";
+mtktest="$($bin/file -m $bin/androidbootimg.magic *-*ramdisk 2>/dev/null | $bb cut -d: -f2-)";
 mtktype=$(echo $mtktest | $bb awk '{ print $3 }');
 if [ "$(echo $mtktest | $bb awk '{ print $1 }')" == "MTK" ]; then
   if [ ! "$mtk" ]; then
-    echo "\nWarning: No MTK header found in zImage!";
+    echo "\nWarning: No MTK header found in kernel!";
     mtk=1;
   fi;
   echo "MTK header found in \"$mtktype\" type ramdisk, removing...";
-  $bb dd bs=512 skip=1 conv=notrunc if="$(ls *-ramdisk*.gz)" of=temprd 2>/dev/null;
-  $bb mv -f temprd "$(ls *-ramdisk*.gz)";
+  $bb dd bs=512 skip=1 conv=notrunc if="$(ls *-*ramdisk)" of=temprd 2>/dev/null;
+  $bb mv -f temprd "$(ls *-*ramdisk)";
 else
   if [ "$mtk" ]; then
     if [ ! "$mtktype" ]; then
@@ -253,7 +255,7 @@ else
     fi;
   fi;
 fi;
-test "$mtk" && echo $mtktype > "$file-mtktype";
+[ "$mtk" ] && echo $mtktype > "$file-mtktype";
 
 if [ -f *-dt ]; then
   dttest="$($bin/file -m $bin/androidbootimg.magic *-dt 2>/dev/null | $bb cut -d: -f2 | $bb awk '{ print $1 }')";
@@ -261,17 +263,17 @@ if [ -f *-dt ]; then
   if [ "$imgtype" == "ELF" ]; then
     case $dttest in
       QCDT|ELF) ;;
-      *) echo "\nNon-QC DTB found, packing zImage and appending...";
-         $bb gzip "$file-zImage";
-         $bb mv -f "$file-zImage.gz" "$file-zImage";
-         cat "$file-dt" >> "$file-zImage";
+      *) echo "\nNon-QC DTB found, packing kernel and appending...";
+         $bb gzip "$file-kernel";
+         $bb mv -f "$file-kernel.gz" "$file-kernel";
+         cat "$file-dt" >> "$file-kernel";
          rm -f "$file-dt"*;;
     esac;
   fi;
 fi;
 
-$bin/file -m $bin/magic *-ramdisk*.gz 2>/dev/null | $bb cut -d: -f2 | $bb awk '{ print $1 }' > "$file-ramdiskcomp";
-ramdiskcomp=`cat *-ramdiskcomp`;
+$bin/file -m $bin/magic *-*ramdisk 2>/dev/null | $bb cut -d: -f2 | $bb awk '{ print $1 }' > "$file-${vendor}ramdiskcomp";
+ramdiskcomp=`cat *-*ramdiskcomp`;
 unpackcmd="$bb $ramdiskcomp -dc";
 compext=$ramdiskcomp;
 case $ramdiskcomp in
@@ -289,7 +291,7 @@ esac;
 if [ "$compext" ]; then
   compext=.$compext;
 fi;
-$bb mv -f "$(ls *-ramdisk*.gz)" "$file-ramdisk.cpio$compext" 2>/dev/null;
+$bb mv -f "$(ls *-*ramdisk)" "$file-${vendor}ramdisk.cpio$compext" 2>/dev/null;
 cd ..;
 if [ "$ramdiskcomp" == "data" ]; then
   echo "Unrecognized format.";
@@ -308,7 +310,7 @@ else
     return 1;
   fi;
   cd ramdisk;
-  $unpackcmd "../split_img/$file-ramdisk.cpio$compext" | EXTRACT_UNSAFE_SYMLINKS=1 $bb cpio -i -d 2>&1;
+  $unpackcmd "../split_img/$file-${vendor}ramdisk.cpio$compext" | EXTRACT_UNSAFE_SYMLINKS=1 $bb cpio -i -d 2>&1;
   if [ $? != 0 ]; then
     cd ..;
     abort;

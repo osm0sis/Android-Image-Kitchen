@@ -19,17 +19,17 @@ bb=$bin/busybox;
 chmod -R 755 $bin $aik/*.sh;
 chmod 644 $bin/magic $bin/androidbootimg.magic $bin/boot_signer-dexed.jar $bin/module.prop $bin/ramdisk.img $bin/avb/* $bin/chromeos/*;
 
-if [ ! -f $bb ]; then
-  bb=busybox;
-fi;
+[ ! -f $bb ] && bb=busybox;
 
-$bb ps | $bb grep -v grep | $bb grep -q zygote && su="su -mm" || su=sh;
+su=sh;
+$bb ps | $bb grep -v grep | $bb grep -q zygote && su="su -mm";
 
 --mount-only() {
   $bb mount | $bb grep -q " $aik/ramdisk " && return 0;
   $su -c "$bb mount -t ext4 -o rw,noatime $aik/split_img/.aik-ramdisk.img $aik/ramdisk" 2>/dev/null;
   if [ $? != 0 ]; then
-    test -e /dev/block/loop1 && minorx=$(ls -l /dev/block/loop1 | $bb awk '{ print $6 }') || minorx=1;
+    minorx=1;
+    [ -e /dev/block/loop1 ] && minorx=$(ls -l /dev/block/loop1 | $bb awk '{ print $6 }');
     i=0;
     while [ $i -lt 64 ]; do
       loop=/dev/block/loop$i;

@@ -5,10 +5,13 @@
 # avoid forced Magisk update-binary replacement breakage
 # see customize.sh for what was previously update-binary
 
-mkdir -p /dev/tmp;
-cd /dev/tmp;
+[ -z $TMPDIR ] && TMPDIR=/dev/tmp;
+
+rm -rf $TMPDIR;
+mkdir -p $TMPDIR;
+cd $TMPDIR;
 
 unzip -o "$3" customize.sh;
 
-. /dev/tmp/customize.sh;
+. $TMPDIR/customize.sh;
 
