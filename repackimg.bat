@@ -13,9 +13,9 @@ if "%~1" == "--local" (
   cd "%~p0"
 )
 dir /a-d split_img >nul 2>&1 || goto nofiles
-for /f "delims=" %%a in ('dir /b split_img\*-ramdiskcomp') do @set "ramdiskcname=%%a"
+for /f "delims=" %%a in ('dir /b split_img\*-*ramdiskcomp') do @set "ramdiskcname=%%a"
 for /f "delims=" %%a in ('type "split_img\%ramdiskcname%"') do @set "ramdiskcomp=%%a"
-dir /a-d ramdisk >nul 2>&1 || if not "%ramdiskcomp%" == "empty" goto nofiles
+dir /a ramdisk >nul 2>&1 || if not "%ramdiskcomp%" == "empty" goto nofiles
 
 echo Android Image Kitchen - RepackImg Script
 echo by osm0sis @ xda-developers
@@ -76,17 +76,30 @@ if errorlevel == 1 (
 )
 echo Packing ramdisk%sumsg% . . .
 echo.
-if not "[%sumsg%]" == "[]" if not exist "%bin%"\sudo.exe (
-  echo Windows sudo required but not found.
-  echo.
-  echo *** Reinstall Android Image Kitchen, then add ***
-  echo *** sudo.exe to your antivirus exceptions!    ***
-  echo.
-  goto error
+if not "[%sumsg%]" == "[]" (
+  if not exist "%bin%"\sudo.exe (
+    echo Windows sudo required but not found.
+    set "nosudo=1"
+  ) else (
+    "%bin%"\sudo.exe --help >nul 2>&1
+    if not errorlevel == 2 (
+      echo Windows sudo required but unable to run.
+      set "nosudo=1"
+    )
+  )
+  if defined nosudo (
+    echo.
+    echo *** Reinstall Android Image Kitchen, then add ***
+    echo *** sudo.exe to your antivirus exceptions!    ***
+    echo.
+    goto error
+  )
 )
 
 echo Using compression: %ramdiskcomp%%lvltxt%
 if not defined level if "%ramdiskcomp%" == "xz" set "level=-1"
+if not defined level if "%ramdiskcomp%" == "lz4" set "level=-9"
+if not defined level if "%ramdiskcomp%" == "lz4-l" set "level=-9"
 set "repackcmd=%ramdiskcomp% %level%"
 set "compext=%ramdiskcomp%"
 if "%ramdiskcomp%" == "gzip" set "compext=gz"
@@ -98,10 +111,10 @@ if "%ramdiskcomp%" == "lz4-l" set "repackcmd=lz4 %level% -l" & set "compext=lz4"
 if "%ramdiskcomp%" == "cpio" set "repackcmd=cat" & set "compext="
 if defined compext set "compext=.%compext%"
 cd ramdisk
-if not "[%sumsg%]" == "[]" (
-  "%bin%"\sudo "%bin%"\find . | "%bin%"\sudo "%bin%"\cpio -H newc -R 0:0 -o -F ..\ramdisk-new.cpio 2>nul
-) else (
+if "[%sumsg%]" == "[]" (
   "%bin%"\find . | "%bin%"\cpio -H newc -R 0:0 -o -F ..\ramdisk-new.cpio 2>nul
+) else (
+  "%bin%"\sudo "%bin%"\find2cpio.bat >nul
 )
 if errorlevel == 1 goto error
 cd ..
@@ -119,18 +132,22 @@ echo.
 for /f "delims=" %%a in ('dir /b split_img\*-imgtype') do @set "imgtypename=%%a"
 for /f "delims=" %%a in ('type "split_img\%imgtypename%"') do @set "imgtype=%%a"
 
-if "%imgtype%" == "KRNL" goto skipzimg
-if not exist "split_img\*-zImage" goto skipzimg
-for /f "delims=" %%a in ('dir /b split_img\*-zImage') do @set "kernelname=%%a"
+if "%imgtype%" == "AOSP_VNDR" (
+  set "vendor=vendor_"
+  goto skipkern
+)
+if "%imgtype%" == "KRNL" goto skipkern
+if not exist "split_img\*-kernel" goto skipkern
+for /f "delims=" %%a in ('dir /b split_img\*-kernel') do @set "kernelname=%%a"
 echo kernel = %kernelname% & set "kernel=split_img/%kernelname%"
-:skipzimg
-for /f "delims=" %%a in ('dir /b split_img\*-ramdisk.cpio*') do @set "ramdiskname=%%a"
+:skipkern
+for /f "delims=" %%a in ('dir /b split_img\*-*ramdisk.cpio*') do @set "ramdiskname=%%a"
 if not defined original (
   set "ramdiskname=ramdisk-new.cpio%compext%"
   set "ramdisk=ramdisk-new.cpio%compext%"
   goto skiporig
 )
-echo ramdisk = %ramdiskname%
+echo %vendor%ramdisk = %ramdiskname%
 set "ramdisk=split_img/"%ramdiskname%""
 :skiporig
 if "%imgtype%" == "KRNL" (
@@ -138,7 +155,7 @@ if "%imgtype%" == "KRNL" (
 )
 
 if not "%imgtype%" == "OSIP" goto skipos
-for /f "delims=" %%a in ('dir /b split_img\*-cmdline') do @set "cmdname=%%a"
+for /f "delims=" %%a in ('dir /b split_img\*-*cmdline') do @set "cmdname=%%a"
 for /f "delims=" %%a in ('type "split_img\%cmdname%"') do @set "cmdline=%%a"
 echo cmdline = %cmdline%
 goto skipaosp
@@ -180,41 +197,49 @@ if not exist "split_img\*-recovery_dtbo" goto skiprecdtbo
 for /f "delims=" %%a in ('dir /b split_img\*-recovery_dtbo') do @set "recoverydtbo=%%a"
 echo recovery_dtbo = %recoverydtbo% & set "recoverydtbo=--recovery_dtbo "split_img/%recoverydtbo%""
 :skiprecdtbo
-if not exist "split_img\*-cmdline" goto skipcmd
-for /f "delims=" %%a in ('dir /b split_img\*-cmdline') do @set "cmdname=%%a"
+if not exist "split_img\*-*cmdline" goto skipcmd
+for /f "delims=" %%a in ('dir /b split_img\*-*cmdline') do @set "cmdname=%%a"
 for /f "delims=" %%a in ('type "split_img\%cmdname%"') do @set "cmdline=%%a"
 set "cmd="split_img/%cmdname%"@cmdline"
-:skipcmd
-echo cmdline = %cmdline%
+echo %vendor%cmdline = %cmdline%
 if defined cmdline set "cmdline=%cmdline:"=\"%"
+:skipcmd
 if not exist "split_img\*-board" goto skipboard
 for /f "delims=" %%a in ('dir /b split_img\*-board') do @set "boardname=%%a"
 for /f "delims=" %%a in ('type "split_img\%boardname%"') do @set "board=%%a"
-:skipboard
 echo board = %board%
 if defined board set board=%board:"=\"%
+:skipboard
+if not exist "split_img\*-base" goto skipbase
 for /f "delims=" %%a in ('dir /b split_img\*-base') do @set "basename=%%a"
 for /f "delims=" %%a in ('type "split_img\%basename%"') do @set "base=%%a"
 echo base = %base%
+:skipbase
+if not exist "split_img\*-pagesize" goto skippage
 for /f "delims=" %%a in ('dir /b split_img\*-pagesize') do @set "pagename=%%a"
 for /f "delims=" %%a in ('type "split_img\%pagename%"') do @set "pagesize=%%a"
 echo pagesize = %pagesize%
+:skippage
+if not exist "split_img\*-kernel_offset" goto skipkoff
 for /f "delims=" %%a in ('dir /b split_img\*-kernel_offset') do @set "koffname=%%a"
 for /f "delims=" %%a in ('type "split_img\%koffname%"') do @set "kerneloff=%%a"
 echo kernel_offset = %kerneloff%
+:skipkoff
+if not exist "split_img\*-ramdisk_offset" goto skiproff
 for /f "delims=" %%a in ('dir /b split_img\*-ramdisk_offset') do @set "roffname=%%a"
 for /f "delims=" %%a in ('type "split_img\%roffname%"') do @set "ramdiskoff=%%a"
 echo ramdisk_offset = %ramdiskoff%
+:skiproff
 if not exist "split_img\*-second_offset" goto skipsoff
 for /f "delims=" %%a in ('dir /b split_img\*-second_offset') do @set "soffname=%%a"
 for /f "delims=" %%a in ('type "split_img\%soffname%"') do @set "secondoff=%%a"
-:skipsoff
 echo second_offset = %secondoff%
+:skipsoff
 if not exist "split_img\*-tags_offset" goto skiptoff
 for /f "delims=" %%a in ('dir /b split_img\*-tags_offset') do @set "toffname=%%a"
 for /f "delims=" %%a in ('type "split_img\%toffname%"') do @set "tagsoff=%%a"
-:skiptoff
 echo tags_offset = %tagsoff%
+:skiptoff
 if not exist "split_img\*-dtb_offset" goto skipdoff
 for /f "delims=" %%a in ('dir /b split_img\*-dtb_offset') do @set "doffname=%%a"
 for /f "delims=" %%a in ('type "split_img\%doffname%"') do @set "dtboff=%%a"
@@ -282,6 +307,7 @@ if "%imgtype%" == "ELF" if not "[%header%]" == "[]" if defined repackelf (
   set "buildcmd=elftool pack -o %outname% header="split_img/%header%" "%kernel%" "%ramdisk%",ramdisk %rpm% %cmd% >nul"
 )
 if "%imgtype%" == "ELF" if not defined buildcmd set "imgtype=AOSP" & echo Warning: ELF format without RPM detected; will be repacked using AOSP format! & echo.
+if "%imgtype%" == "AOSP_VNDR" set "buildcmd=mkbootimg --vendor_ramdisk "%ramdisk%" %dtb% --vendor_cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% --tags_offset "%tagsoff%" --dtb_offset "%dtboff%" --os_version "%osver%" --os_patch_level "%oslvl%" --header_version "%hdrver%" --vendor_boot %outname%"
 if "%imgtype%" == "AOSP" set "buildcmd=mkbootimg --kernel "%kernel%" --ramdisk "%ramdisk%" %second% %dtb% %recoverydtbo% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% --second_offset "%secondoff%" --tags_offset "%tagsoff%" --dtb_offset "%dtboff%" --os_version "%osver%" --os_patch_level "%oslvl%" --header_version "%hdrver%" %hashtype% %dt% -o %outname%"
 if "%imgtype%" == "AOSP-PXA" set "buildcmd=pxa-mkbootimg --kernel "%kernel%" --ramdisk "%ramdisk%" %second% --cmdline "%cmdline%" --board "%board%" --base %base% --pagesize %pagesize% --kernel_offset %kerneloff% --ramdisk_offset %ramdiskoff% --second_offset "%secondoff%" --tags_offset "%tagsoff%" --unknown "%unknown%" %dt% -o %outname%"
 if "%imgtype%" == "KRNL" set "buildcmd=rkcrc -k "%ramdisk%" %outname%"
@@ -289,10 +315,10 @@ if "%imgtype%" == "OSIP" (
   md split_img\temp 2>nul
   copy /b split_img\*-header split_img\temp\hdr >nul 2>&1
   copy /b split_img\*-sig split_img\temp\sig >nul 2>&1
-  copy /b split_img\*-cmdline split_img\temp\cmdline.txt >nul
+  copy /b split_img\*-*cmdline split_img\temp\cmdline.txt >nul
   copy /b split_img\*-parameter split_img\temp\parameter >nul
   copy /b split_img\*-bootstub split_img\temp\bootstub >nul
-  copy /b split_img\*-zImage split_img\temp\kernel >nul
+  copy /b split_img\*-kernel split_img\temp\kernel >nul
   "%bin%"\cat "%ramdisk%" > split_img\temp\ramdisk.cpio.gz
 )
 if "%imgtype%" == "OSIP" set "buildcmd=mboot -d split_img\temp -f %outname%"
@@ -400,8 +426,10 @@ echo No files found to be packed/built.
 
 :error
 echo Error!
+set "exitcode=1"
 
 :end
 echo.
 echo %cmdcmdline% | findstr /i pushd >nul
 if errorlevel 1 pause
+exit /b %exitcode%

@@ -121,6 +121,7 @@ echo %imgtype%>"%~nx1-imgtype"
 echo Image type: %imgtype%
 echo.
 
+if "%imgtype%" == "AOSP_VNDR" set "supported=1"
 if "%imgtype%" == "AOSP" set "supported=1"
 if "%imgtype%" == "AOSP-PXA" set "supported=1"
 if "%imgtype%" == "ELF" set "supported=1"
@@ -192,6 +193,7 @@ del "%~nx1-sizetest"
 :skiptrim
 echo Splitting image to "split_img/" . . .
 echo.
+if "%imgtype%" == "AOSP_VNDR" "%bin%"\unpackbootimg -i "%file%" & set "vendor=vendor_"
 if "%imgtype%" == "AOSP" "%bin%"\unpackbootimg -i "%file%"
 if "%imgtype%" == "AOSP-PXA" "%bin%"\pxa-unpackbootimg -i "%file%"
 if "%imgtype%" == "ELF" (
@@ -201,7 +203,7 @@ if "%imgtype%" == "ELF" (
   rd /s /q elftool_out >nul 2>&1
   "%bin%"\unpackelf -i "%file%"
 )
-if "%imgtype%" == "KRNL" "%bin%"\dd bs=4096 skip=8 iflag=skip_bytes conv=notrunc if="%file%" of="%~nx1-ramdisk.cpio.gz" 2>&1 | "%bin%"\tail -n+3 | "%bin%"\cut -d" " -f1-2
+if "%imgtype%" == "KRNL" "%bin%"\dd bs=4096 skip=8 iflag=skip_bytes conv=notrunc if="%file%" of="%~nx1-ramdisk" 2>&1 | "%bin%"\tail -n+3 | "%bin%"\cut -d" " -f1-2
 if "%imgtype%" == "OSIP" (
   "%bin%"\mboot -u -f "%file%"
   if errorlevel == 1 set "error=1"
@@ -210,8 +212,8 @@ if "%imgtype%" == "OSIP" (
   move /y cmdline.txt "%~nx1-cmdline" >nul 2>&1
   move /y parameter "%~nx1-parameter" >nul 2>&1
   move /y bootstub "%~nx1-bootstub" >nul 2>&1
-  move /y kernel "%~nx1-zImage" >nul 2>&1
-  move /y ramdisk.cpio.gz "%~nx1-ramdisk.cpio.gz" >nul 2>&1
+  move /y kernel "%~nx1-kernel" >nul 2>&1
+  move /y ramdisk.cpio.gz "%~nx1-ramdisk" >nul 2>&1
 )
 if "%imgtype%" == "U-Boot" (
   "%bin%"\dumpimage -l "%file%"
@@ -224,15 +226,15 @@ if "%imgtype%" == "U-Boot" (
   type "%~nx1-header" | findstr "Address:" | "%bin%"\cut -c15- > "%~nx1-addr"
   type "%~nx1-header" | findstr "Point:" | "%bin%"\cut -c15- > "%~nx1-ep"
   del "%~nx1-header"
-  "%bin%"\dumpimage -p 0 -o "%~nx1-zImage" "%file%"
+  "%bin%"\dumpimage -p 0 -o "%~nx1-kernel" "%file%"
   if errorlevel == 1 set "error=1"
   for /f "delims=" %%a in ('type "%~nx1-type"') do (
     if "%%a" == "Multi" (
-      "%bin%"\dumpimage -p 1 -o "%~nx1-ramdisk.cpio.gz" "%file%"
+      "%bin%"\dumpimage -p 1 -o "%~nx1-ramdisk" "%file%"
     ) else if "%%a" == "RAMDisk" (
-      move /y "%~nx1-zImage" "%~nx1-ramdisk.cpio.gz" >nul 2>&1
+      move /y "%~nx1-kernel" "%~nx1-ramdisk" >nul 2>&1
     ) else (
-      copy /y nul "%~nx1-ramdisk.cpio.gz" >nul
+      copy /y nul "%~nx1-ramdisk" >nul
     )
   )
 )
@@ -244,21 +246,23 @@ if "%error%" == "1" (
 )
 echo.
 
-"%bin%"\file -m "%bin%\androidbootimg.magic" *-zImage 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-mtktest"
-for /f "delims=" %%a in ('type "%~nx1-mtktest"') do @set "mtktest=%%a"
+if exist "*-kernel" (
+  "%bin%"\file -m "%bin%\androidbootimg.magic" *-kernel 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-mtktest"
+  for /f "delims=" %%a in ('type "%~nx1-mtktest"') do @set "mtktest=%%a"
+)
 if "%mtktest%" == "MTK" (
   set "mtk=1"
-  echo MTK header found in zImage, removing . . .
-  "%bin%"\dd bs=512 skip=1 conv=notrunc if="%~nx1-zImage" of="tempzimg" 2>nul
-  move /y tempzimg "%~nx1-zImage" >nul
+  echo MTK header found in kernel, removing . . .
+  "%bin%"\dd bs=512 skip=1 conv=notrunc if="%~nx1-kernel" of="tempkern" 2>nul
+  move /y tempkern "%~nx1-kernel" >nul
 )
-for /f "delims=" %%a in ('dir /b *-ramdisk*.gz') do @set "ramdiskname=%%a"
+for /f "delims=" %%a in ('dir /b *-*ramdisk') do @set "ramdiskname=%%a"
 "%bin%"\file -m "%bin%\androidbootimg.magic" "%ramdiskname%" 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-mtktest"
 for /f "delims=" %%a in ('type "%~nx1-mtktest"') do @set "mtktest=%%a"
 "%bin%"\file -m "%bin%\androidbootimg.magic" "%ramdiskname%" 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f4 > "%~nx1-mtktype"
 for /f "delims=" %%a in ('type "%~nx1-mtktype"') do @set "mtktype=%%a"
 if "%mtktest%" == "MTK" (
-  if not defined mtk echo Warning: No MTK header found in zImage! & set "mtk=1"
+  if not defined mtk echo Warning: No MTK header found in kernel! & set "mtk=1"
   echo MTK header found in "%mtktype%" type ramdisk, removing . . .
   "%bin%"\dd bs=512 skip=1 conv=notrunc if="%ramdiskname%" of="temprd" 2>nul
   move /y temprd "%ramdiskname%" >nul
@@ -279,17 +283,17 @@ if exist "*-dt" (
   "%bin%"\file -m "%bin%\androidbootimg.magic" *-dt 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-dttype"
   for /f "delims=" %%a in ('type "%~nx1-dttype"') do (
     if "%imgtype%" == "ELF" if not "%%a" == "QCDT" if not "%%a" == "ELF" (
-      echo Non-QC DTB found, packing zImage and appending . . .
+      echo Non-QC DTB found, packing kernel and appending . . .
       echo.
-      "%bin%"\gzip --no-name -9 "%~nx1-zImage"
-      copy /b "%~nx1-zImage.gz"+"%~nx1-dt" "%~nx1-zImage" >nul
-      del "%~nx1-dt"* "%~nx1-zImage.gz"
+      "%bin%"\gzip --no-name -9 "%~nx1-kernel"
+      copy /b "%~nx1-kernel.gz"+"%~nx1-dt" "%~nx1-kernel" >nul
+      del "%~nx1-dt"* "%~nx1-kernel.gz"
     )
   )
 )
 
-"%bin%"\file -m "%bin%\magic" *-ramdisk*.gz 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-ramdiskcomp"
-for /f "delims=" %%a in ('type "%~nx1-ramdiskcomp"') do @set "ramdiskcomp=%%a"
+"%bin%"\file -m "%bin%\magic" *-*ramdisk 2>nul | "%bin%"\cut -d: -f2 | "%bin%"\cut -d" " -f2 > "%~nx1-%vendor%ramdiskcomp"
+for /f "delims=" %%a in ('type "%~nx1-%vendor%ramdiskcomp"') do @set "ramdiskcomp=%%a"
 set "unpackcmd=%ramdiskcomp% -dc"
 set "compext=%ramdiskcomp%"
 if "%ramdiskcomp%" == "gzip" set "unpackcmd=gzip -dcq" & set "compext=gz"
@@ -301,7 +305,7 @@ if "%ramdiskcomp%" == "lz4-l" set "unpackcmd=lz4 -dcq" & set "compext=lz4"
 if "%ramdiskcomp%" == "cpio" set "unpackcmd=cat" & set "compext="
 if "%ramdiskcomp%" == "empty" set "compext=empty"
 if defined compext set "compext=.%compext%"
-ren *ramdisk*.gz *ramdisk.cpio%compext%
+ren *-*ramdisk *-*ramdisk.cpio%compext%
 cd ..
 if "%ramdiskcomp%" == "data" echo Unrecognized format. & goto error
 
@@ -312,7 +316,7 @@ cd ramdisk
 if errorlevel == 1 goto error
 echo Compression used: %ramdiskcomp%
 if not defined compext if not "%ramdiskcomp%" == "cpio" echo. & echo Unsupported format. & goto error
-"%bin%"\%unpackcmd% "..\split_img\%~nx1-ramdisk.cpio%compext%" | "%bin%"\cpio -i -d --no-absolute-filenames
+"%bin%"\%unpackcmd% "..\split_img\%~nx1-%vendor%ramdisk.cpio%compext%" | "%bin%"\cpio -i -d --no-absolute-filenames
 if errorlevel == 1 goto error
 cd ..
 :nord
@@ -327,8 +331,10 @@ echo No image file supplied.
 
 :error
 echo Error!
+set "exitcode=1"
 
 :end
 echo.
 echo %cmdcmdline% | findstr /i pushd >nul
 if errorlevel 1 pause
+exit /b %exitcode%
