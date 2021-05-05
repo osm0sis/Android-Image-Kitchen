@@ -1,7 +1,7 @@
 #------------------------------------------------------------------------------
 # Slimmed down magic file for archives only
 #------------------------------------------------------------------------------
-# $File: archive,v 1.133 2019/11/15 21:03:14 christos Exp $
+# $File: archive,v 1.145 2021/01/03 20:58:47 christos Exp $
 # archive:  file(1) magic for archive formats (see also "msdos" for self-
 #           extracting compressed archives)
 #
@@ -236,10 +236,11 @@
 #!:ext	deb/udeb
 >14	string		-binary	Debian binary package
 !:mime	application/vnd.debian.binary-package
-#!:ext	deb/udeb
+# For ipk packager see also https://en.wikipedia.org/wiki/Opkg
+#!:ext	deb/udeb/ipk
 # This should not happen
 >14	default		x	Unknown Debian package
-# NL terminated version; for most Debian cases this is 2.0 or 2.1 for splitted
+# NL terminated version; for most Debian cases this is 2.0 or 2.1 for split
 >68	string		>\0		(format %s)
 #>68	string		!2.0\n
 #>>68	string		x		(format %.3s)
@@ -250,8 +251,17 @@
 >>0	search/0x93e4f	data.tar.	\b, data compression
 # the above line only works if FILE_BYTES_MAX in ../../src/file.h is raised
 # for example like libreoffice-dev-doc_1%3a5.2.7-1+rpi1+deb9u3_all.deb
->>>&0	string		x		%.4s
-# splitted debian package case
+>>>&0	string		x		%.2s
+# skip space (0x20 BSD) and slash (0x2f System V) character marking end of name
+>>>&2	ubyte		!0x20
+>>>>&-1	ubyte		!0x2f
+# display 3rd character of file name extension like 2 of bz2 or m of lzma
+>>>>>&-1	ubyte	x		\b%c
+>>>>>>&0	ubyte	!0x20
+>>>>>>>&-1	ubyte	!0x2f
+# display 4th character of file name extension like a of lzma
+>>>>>>>>&-1	ubyte	x		\b%c
+# split debian package case
 >68	string		=2.1\n
 # dpkg-1.18.25/dpkg-split/info.c
 # NL terminated ASCII package name like ckermit
@@ -443,30 +453,43 @@
 # URL:		https://wiki.68kmla.org/DiskCopy_4.2_format_specification
 # reference:	http://nulib.com/library/FTN.e00005.htm
 0x52	ubeshort	0x0100
-# test for disk size equal or above 400k
->0x40	ubelong		>409599	Apple DiskCopy 4.2 image
+# test for disk image size equal or above 400k
+>0x40	ubelong		>409599
+# test also for disk image size equal or below 1440k to skip
+# windows7en.mbr UNICODE.DAT
+>>0x40	ubelong		<1474561
+# To skip Flags$StringJoiner.class with size 00106A61h test also for only 4 disk image sizes
+# 00064000 for  400k GCR disks
+# 000c8000 for  800k GCR disks
+# 000b4000 for  720k MFM disks
+# 00168000 for 1440k MFM disks
+>>>0x40	ubelong&0xffE03fFF	0
+#	display information of Apple DiskCopy 4.2 floppy image
+# image pascal name padded with NULs like Microsoft Mail
+>00	pstring/B	x	Apple DiskCopy 4.2 image %s
 #!:mime	application/octet-stream
+!:mime	application/x-dc42-floppy-image
 !:apple	dCpydImg
 #!:ext	image/dc42
-# image pascal name padded with NULs like Microsoft Mail
->>00	pstring/B	x	%s
 # data size in bytes like 409600
->>0x40	ubelong		x	\b, %u bytes
+>0x40	ubelong		x	\b, %u bytes
+# for debugging purpose size in hexadecimal
+#>0x40	ubelong		x	(0x%8.8x)
 # tag size in bytes
->>0x44	ubelong		>0	\b, 0x%x tag size
+>0x44	ubelong		>0	\b, 0x%x tag size
 # data checksum
-#>>0x48	ubelong		x	\b, 0x%x checksum
+#>0x48	ubelong		x	\b, 0x%x checksum
 # tag checksum
-#>>0x4c	ubelong		x	\b, 0x%x tag checksum
+#>0x4c	ubelong		x	\b, 0x%x tag checksum
 # disk encoding
->>0x50	ubyte		0	\b, GCR CLV ssdd (400k)
->>0x50	ubyte		1	\b, GCR CLV dsdd (800k)
->>0x50	ubyte		2	\b, MFM CAV dsdd (720k)
->>0x50	ubyte		3	\b, MFM CAV dshd (1440k)
->>0x50	ubyte		>3	\b, 0x%x encoding
+>0x50	ubyte		0	\b, GCR CLV ssdd (400k)
+>0x50	ubyte		1	\b, GCR CLV dsdd (800k)
+>0x50	ubyte		2	\b, MFM CAV dsdd (720k)
+>0x50	ubyte		3	\b, MFM CAV dshd (1440k)
+>0x50	ubyte		>3	\b, 0x%x encoding
 # format byte
->>0x51	ubyte		x	\b, 0x%x format
-#>>0x54	ubequad		x	\b, data 0x%16.16llx
+>0x51	ubyte		x	\b, 0x%x format
+#>0x54	ubequad		x	\b, data 0x%16.16llx
 # ESP, could this conflict with Easy Software Products' (e.g.ESP ghostscript) documentation?
 0	string	ESP ESP archive data
 # ZPack
@@ -922,71 +945,120 @@
 
 #   OpenOffice formats (for OpenOffice 1.x / StarOffice 6/7)
 #    (mimetype contains "application/vnd.sun.xml.<SUBTYPE>")
+# URL:		https://en.wikipedia.org/wiki/OpenOffice.org_XML
+# reference:	http://fileformats.archiveteam.org/wiki/OpenOffice.org_XML
 >>50	string	vnd.sun.xml.		OpenOffice.org 1.x
 >>>62	string	writer			Writer
 >>>>68	byte	!0x2e			document
+!:mime	application/vnd.sun.xml.writer
+#!:ext	sxw
 >>>>68	string	.template		template
+!:mime	application/vnd.sun.xml.writer.template
+#!:ext	stw
+>>>>68	string	.web			Web template
+!:mime	application/vnd.sun.xml.writer.web
+#!:ext	stw
 >>>>68	string	.global			global document
+!:mime	application/vnd.sun.xml.writer.global
+#!:ext	sxg
 >>>62	string	calc			Calc
 >>>>66	byte	!0x2e			spreadsheet
+!:mime	application/vnd.sun.xml.calc
+#!:ext	sxc
 >>>>66	string	.template		template
+!:mime	application/vnd.sun.xml.calc.template
+#!:ext	stc
 >>>62	string	draw			Draw
 >>>>66	byte	!0x2e			document
+!:mime	application/vnd.sun.xml.draw
+#!:ext	sxd
 >>>>66	string	.template		template
+!:mime	application/vnd.sun.xml.draw.template
+#!:ext	std
 >>>62	string	impress			Impress
 >>>>69	byte	!0x2e			presentation
+!:mime	application/vnd.sun.xml.impress
+#!:ext	sxi
 >>>>69	string	.template		template
+!:mime	application/vnd.sun.xml.impress.template
+#!:ext	sti
 >>>62	string	math			Math document
+!:mime	application/vnd.sun.xml.math
+#!:ext	sxm
 >>>62	string	base			Database file
+!:mime	application/vnd.sun.xml.base
+#!:ext	sdb
 
 #   OpenDocument formats (for OpenOffice 2.x / StarOffice >= 8)
+#   URL: http://fileformats.archiveteam.org/wiki/OpenDocument
 #    https://lists.oasis-open.org/archives/office/200505/msg00006.html
 #    (mimetype contains "application/vnd.oasis.opendocument.<SUBTYPE>")
 >>50	string	vnd.oasis.opendocument.	OpenDocument
 >>>73	string	text
 >>>>77	byte	!0x2d			Text
 !:mime	application/vnd.oasis.opendocument.text
+#!:ext	odt
 >>>>77	string	-template		Text Template
 !:mime	application/vnd.oasis.opendocument.text-template
+#!:ext	ott
 >>>>77	string	-web			HTML Document Template
 !:mime	application/vnd.oasis.opendocument.text-web
+#!:ext	oth
 >>>>77	string	-master			Master Document
 !:mime	application/vnd.oasis.opendocument.text-master
+#!:ext	odm
 >>>73	string	graphics
 >>>>81	byte	!0x2d			Drawing
 !:mime	application/vnd.oasis.opendocument.graphics
->>>>81	string	-template		Template
+#!:ext	odg
+>>>>81	string	-template		Drawing Template
 !:mime	application/vnd.oasis.opendocument.graphics-template
+#!:ext	otg
 >>>73	string	presentation
 >>>>85	byte	!0x2d			Presentation
 !:mime	application/vnd.oasis.opendocument.presentation
->>>>85	string	-template		Template
+#!:ext	odp
+>>>>85	string	-template		Presentation Template
 !:mime	application/vnd.oasis.opendocument.presentation-template
+#!:ext	otp
 >>>73	string	spreadsheet
 >>>>84	byte	!0x2d			Spreadsheet
 !:mime	application/vnd.oasis.opendocument.spreadsheet
->>>>84	string	-template		Template
+#!:ext	ods
+>>>>84	string	-template		Spreadsheet Template
 !:mime	application/vnd.oasis.opendocument.spreadsheet-template
+#!:ext	ots
 >>>73	string	chart
 >>>>78	byte	!0x2d			Chart
 !:mime	application/vnd.oasis.opendocument.chart
->>>>78	string	-template		Template
+#!:ext	odc
+>>>>78	string	-template		Chart Template
 !:mime	application/vnd.oasis.opendocument.chart-template
+#!:ext	otc
 >>>73	string	formula
 >>>>80	byte	!0x2d			Formula
 !:mime	application/vnd.oasis.opendocument.formula
->>>>80	string	-template		Template
+#!:ext	odf
+>>>>80	string	-template		Formula Template
 !:mime	application/vnd.oasis.opendocument.formula-template
+#!:ext	otf
+# https://www.loc.gov/preservation/digital/formats/fdd/fdd000441.shtml
 >>>73	string	database		Database
 !:mime	application/vnd.oasis.opendocument.database
+#!:ext	odb
 # Valid for LibreOffice Base 6.0.1.1 at least
 >>>73	string	base 			Database
-!:mime	application/vnd.oasis.opendocument.base
+# https://bugs.documentfoundation.org/show_bug.cgi?id=45854
+!:mime	application/vnd.oasis.opendocument.database
+#!:mime	application/vnd.oasis.opendocument.base
+#!:ext	odb
 >>>73	string	image
 >>>>78	byte	!0x2d			Image
 !:mime	application/vnd.oasis.opendocument.image
->>>>78	string	-template		Template
+#!:ext	odi
+>>>>78	string	-template		Image Template
 !:mime	application/vnd.oasis.opendocument.image-template
+#!:ext	oti
 
 #  EPUB (OEBPS) books using OCF (OEBPS Container Format)
 #    https://www.idpf.org/ocf/ocf1.0/download/ocf10.htm, section 4.
@@ -1004,12 +1076,33 @@
 >>>62	string	draw.template+zip	Draw template, version 14-16
 !:mime	application/x-vnd.corel.draw.template+zip
 #!:ext	cdrt
->>>62	string	zcf.draw.document+zip	Draw drawing, version 17-21
+>>>62	string	zcf.draw.document+zip	Draw drawing, version 17-22
 !:mime	application/x-vnd.corel.zcf.draw.document+zip
 #!:ext	cdr
->>>62	string	zcf.draw.template+zip	Draw template, version 17-21
+>>>62	string	zcf.draw.template+zip	Draw template, version 17-22
 !:mime	application/x-vnd.corel.zcf.draw.template+zip
 #!:ext	cdt/cdrt
+# URL:	http://product.corel.com/help/CorelDRAW/540240626/Main/EN/Doc/CorelDRAW-Other-file-formats.html
+>>>62	string	zcf.pattern+zip		Draw pattern, version 22
+!:mime	application/x-vnd.corel.zcf.pattern+zip
+#!:ext	pat
+# URL:		https://en.wikipedia.org/wiki/Corel_Designer
+# Reference:	http://fileformats.archiveteam.org/wiki/Corel_Designer
+# Note:		called by TrID "Corel DESIGN graphics"
+>>>62	string	designer.document+zip		DESIGNER graphics, version 14-16
+!:mime	application/x-vnd.corel.designer.document+zip
+#!:ext	des
+>>>62	string	zcf.designer.document+zip	DESIGNER graphics, version 17-21
+!:mime	application/x-vnd.corel.zcf.designer.document+zip
+#!:ext	des
+# URL:	http://product.corel.com/help/CorelDRAW/540223850/Main/EN/Documentation/
+#	CorelDRAW-Corel-Symbol-Library-CSL.html
+>>>62	string	symbol.library+zip		Symbol Library, version 6-16.3
+!:mime	application/x-vnd.corel.symbol.library+zip
+#!:ext	csl
+>>>62	string	zcf.symbol.library+zip		Symbol Library, version 17-22
+!:mime	application/x-vnd.corel.zcf.symbol.library+zip
+#!:ext	csl
 
 #  Catch other ZIP-with-mimetype formats
 #	In a ZIP file, the bytes immediately after a member's contents are
@@ -1037,15 +1130,19 @@
 >>>>38		search/64       .app/   iOS App
 !:mime application/x-ios-app
 
+>30	search/100/b application/epub+zip	EPUB document
+!:mime application/epub+zip
 
 # Generic zip archives (Greg Roelofs, c/o zip-bugs@wkuvx1.wku.edu)
 #   Next line excludes specialized formats:
 >(26.s+30)	leshort	!0xcafe
->>26    string          !\x8\0\0\0mimetype	Zip archive data
+>>30	search/100/b !application/epub+zip
+>>>26    string          !\x8\0\0\0mimetype	Zip archive data
 !:mime	application/zip
->>>4	beshort		x			\b, at least
->>>4	beshort		x			to extract
->>>0x161	string		WINZIP		\b, WinZIP self-extracting
+>>>>4	beshort		x			\b, at least
+>>>>4	beshort		x			to extract
+>>>>8	beshort		x			\b, compression method=
+>>>>0x161	string		WINZIP		\b, WinZIP self-extracting
 
 # StarView Metafile
 # From Pierre Ducroquet <pinaraf@pinaraf.info>
@@ -1166,8 +1263,17 @@
 >>0x2A	string	>\0		: %s
 
 # DR-DOS 7.03 Packed File *.??_
-0	string	Packed\ File\ 	Personal NetWare Packed File
->12	string	x		\b, was "%.12s"
+# Reference: http://www.antonis.de/dos/dos-tuts/mpdostip/html/nwdostip.htm
+# Note:	unpacked by PNUNPACK.EXE
+0	string	Packed\ File\ 
+# by looking for Control-Z skip ASCII text starting with Packed File 
+>0x18	ubyte	0x1a		Personal NetWare Packed File
+!:mime	application/x-novell-compress
+#!:ext	??_
+>>12	string	x		\b, was "%.12s"
+# 1 or 2
+#>>0x19	ubyte	x		\b, at 0x19 %u
+>>0x1b	ulelong	x		with %u bytes
 
 # EET archive
 # From: Tilman Sauerbeck <tilman@code-monkey.de>
@@ -1350,9 +1456,30 @@
 # path[CXBTFFile[MaximumPathLength=256]
 >>9	string	x		\b, 1st %s
 
+# ALZIP archive
+# by Hyungjun Park <hyungjun.park@worksmobile.com>, Hajin Jang <hajin_jang@worksmobile.com>
+# http://kippler.com/win/unalz/
+# https://salsa.debian.org/l10n-korean-team/unalz
+0	string	ALZ\001		ALZ archive data
+#!:ext   alz
+
+# https://cf-aldn.altools.co.kr/setup/EGG_Specification.zip
+0	string	EGGA		EGG archive data,
+#!:ext   egg
+>5	byte	x		version %u
+>4	byte	x		\b.%u
+>>0x0E	ulelong	=0x08E28222
+>>0x0E	ulelong	=0x24F5A262	\b, split
+>>0x0E	ulelong	=0x24E5A060	\b, solid
+>>0x0E	default	x		\b, unknown
+
+# PAQ9A archive
+# URL: http://mattmahoney.net/dc/#paq9a
+# Note: Line 1186 of paq9a.cpp gives the magic bytes
+0	string	pQ9\001		PAQ9A archive
 
 #------------------------------------------------------------------------------
-# $File: compress,v 1.77 2019/10/08 20:25:13 christos Exp $
+# $File: compress,v 1.80 2021/03/15 17:49:24 christos Exp $
 # compress:  file(1) magic for pure-compression formats (no archives)
 #
 # compress, gzip, pack, compact, huf, squeeze, crunch, freeze, yabba, etc.
@@ -1435,7 +1562,7 @@
 #	kleopatra_splashscreen.svgz	gzipped .svg
 #!:ext	gz/tgz/tpz/zabw/svgz
 # size of the original (uncompressed) input data modulo 2^32
->>-4	ulelong		x		\b, original size modulo 2^32 %u
+>>>-4	ulelong		x		\b, original size modulo 2^32 %u
 #	display information of gzip compressed files
 #>2	byte		x		THIS iS GZIP
 >2	byte		<8		\b, reserved method
@@ -1610,7 +1737,12 @@
 >>5	lequad		!0xffffffffffffffff	non-streamed, size %lld
 
 # http://tukaani.org/xz/xz-file-format.txt
-0	ustring		\xFD7zXZ\x00		xz compressed data
+0	ustring		\xFD7zXZ\x00		xz compressed data, checksum
+>7	byte&0xf	0x0			NONE
+>7	byte&0xf	0x1			CRC32
+>7	byte&0xf	0x4			CRC64
+>7	byte&0xf	0xa			SHA-256
+
 !:strength * 2
 !:mime	application/x-xz
 
@@ -1701,9 +1833,14 @@
 0	string	bvx-	lzfse encoded, no compression
 0	string	bvx1	lzfse compressed, uncompressed tables
 0	string	bvx2	lzfse compressed, compressed tables
+0	string	bvxn	lzfse encoded, lzvn compressed
+
+# pcxLib.exe compression program
+# http://www.shikadi.net/moddingwiki/PCX_Library
+0	string/b	pcxLib
 
 #------------------------------------------------------------
-# $File: android,v 1.16 2019/11/15 21:03:14 christos Exp $
+# $File: android,v 1.18 2021/02/23 00:51:10 christos Exp $
 # Various android related magic entries
 #------------------------------------------------------------
 
@@ -1758,3 +1895,22 @@
 0	lelong	0xd0b5b1c4	Android cryptfs footer
 >4	leshort	x	\b, version: %d
 >6	leshort	x	\b.%d
+
+# Android Vdex format
+# From https://android.googlesource.com/\
+# platform/art/+/master/runtime/vdex_file.h
+0	string	vdex	Android vdex file,
+>4	string	>000	verifier deps version: %s,
+>8	string	>000	dex section version: %s,
+>12	lelong	>0	number of dex files: %d,
+>16	lelong	>0	verifier deps size: %d
+
+# Android Vdex format, dexfile is currently being updated
+# by android system
+# From https://android.googlesource.com/\
+# platform/art/+/master/dex2oat/dex2oat.cc
+0	string	wdex	Android vdex file, being processed by dex2oat,
+>4	string	>000	verifier deps version: %s,
+>8	string	>000	dex section version: %s,
+>12	lelong	>0	number of dex files: %d,
+>16	lelong	>0	verifier deps size: %d

@@ -40,7 +40,7 @@ case $plat in
   ;;
   linux)
     cpio=cpio;
-    test "$(cpio --version | head -n1 | rev | cut -d\  -f1 | rev)" == "2.13" && cpiowarning=1;
+    [ "$(cpio --version | head -n1 | rev | cut -d\  -f1 | rev)" = "2.13" ] && cpiowarning=1;
     statarg="-c %U";
   ;;
 esac;
@@ -82,7 +82,7 @@ while [ "$1" ]; do
   shift;
 done;
 
-ramdiskcomp=`cat split_img/*-ramdiskcomp 2>/dev/null`;
+ramdiskcomp=`cat split_img/*-*ramdiskcomp 2>/dev/null`;
 if [ -z "$(ls ramdisk/* 2>/dev/null)" ] && [ ! "$ramdiskcomp" = "empty" -a ! "$original" ]; then
   echo "No files found to be packed/built.";
   abort;
@@ -120,7 +120,12 @@ else
     echo "Warning: Using cpio 2.13 may result in an unusable repack; downgrade to 2.12 to be safe!";
     echo " ";
   fi;
-  test -z "$level" -a "$ramdiskcomp" = "xz" && level=-1;
+  if [ -z "$level" ]; then
+    case $ramdiskcomp in
+      xz) level=-1;;
+      lz4*) level=-9;;
+    esac;
+  fi;
   echo "Using compression: $ramdiskcomp$lvltxt";
   repackcmd="$ramdiskcomp $level";
   compext=$ramdiskcomp;
@@ -151,26 +156,32 @@ echo " ";
 echo "Getting build information...";
 cd split_img;
 imgtype=`cat *-imgtype`;
-if [ "$imgtype" != "KRNL" -a -f *-zImage ]; then
-  kernel=`ls *-zImage`;                  echo "kernel = $kernel";
-  kernel="split_img/$kernel";
-fi;
+case $imgtype in
+  KRNL) ;;
+  AOSP_VNDR) vendor=vendor_;;
+  *)
+    if [ -f *-kernel ]; then
+      kernel=`ls *-kernel`;              echo "kernel = $kernel";
+      kernel="split_img/$kernel";
+    fi;
+  ;;
+esac;
 if [ "$original" ]; then
-  ramdisk=`ls *-ramdisk.cpio*`;          echo "ramdisk = $ramdisk";
+  ramdisk=`ls *-*ramdisk.cpio*`;         echo "${vendor}ramdisk = $ramdisk";
   ramdisk="split_img/$ramdisk";
 else
   ramdisk="ramdisk-new.cpio$compext";
 fi;
 case $imgtype in
   KRNL) rsz=$(wc -c < ../"$ramdisk");    echo "ramdisk_size = $rsz";;
-  OSIP)                                  echo "cmdline = $(cat *-cmdline)";;
+  OSIP)                                  echo "cmdline = $(cat *-*cmdline)";;
   U-Boot)
     name=`cat *-name`;                   echo "name = $name";
     uarch=`cat *-arch`;
     os=`cat *-os`;
     type=`cat *-type`;
     comp=`cat *-comp`;                   echo "type = $uarch $os $type ($comp)";
-    test "$comp" = "uncompressed" && comp=none;
+    [ "$comp" = "uncompressed" ] && comp=none;
     addr=`cat *-addr`;                   echo "load_addr = $addr";
     ep=`cat *-ep`;                       echo "entry_point = $ep";
   ;;
@@ -187,18 +198,26 @@ case $imgtype in
       recoverydtbo=`ls *-recovery_dtbo`; echo "recovery_dtbo = $recoverydtbo";
       recoverydtbo=(--recovery_dtbo "split_img/$recoverydtbo");
     fi;
-    if [ -f *-cmdline ]; then
-      cmdname=`ls *-cmdline`;
-      cmdline=`cat *-cmdline`;           echo "cmdline = $cmdline";
+    if [ -f *-*cmdline ]; then
+      cmdname=`ls *-*cmdline`;
+      cmdline=`cat *-*cmdline`;          echo "${vendor}cmdline = $cmdline";
       cmd=("split_img/$cmdname"@cmdline);
     fi;
     if [ -f *-board ]; then
       board=`cat *-board`;               echo "board = $board";
     fi;
-    base=`cat *-base`;                   echo "base = $base";
-    pagesize=`cat *-pagesize`;           echo "pagesize = $pagesize";
-    kerneloff=`cat *-kernel_offset`;     echo "kernel_offset = $kerneloff";
-    ramdiskoff=`cat *-ramdisk_offset`;   echo "ramdisk_offset = $ramdiskoff";
+    if [ -f *-base ]; then
+      base=`cat *-base`;                 echo "base = $base";
+    fi;
+    if [ -f *-pagesize ]; then
+      pagesize=`cat *-pagesize`;         echo "pagesize = $pagesize";
+    fi;
+    if [ -f *-kernel_offset ]; then
+      kerneloff=`cat *-kernel_offset`;   echo "kernel_offset = $kerneloff";
+    fi;
+    if [ -f *-ramdisk_offset ]; then
+      ramdiskoff=`cat *-ramdisk_offset`; echo "ramdisk_offset = $ramdiskoff";
+    fi;
     if [ -f *-second_offset ]; then
       secondoff=`cat *-second_offset`;   echo "second_offset = $secondoff";
     fi;
@@ -261,7 +280,7 @@ else
   outname=image-new.img;
 fi;
 
-test "$dttype" == "ELF" && repackelf=1;
+[ "$dttype" = "ELF" ] && repackelf=1;
 if [ "$imgtype" = "ELF" ] && [ ! "$header" -o ! "$repackelf" ]; then
   imgtype=AOSP;
   echo " ";
@@ -274,6 +293,7 @@ echo " ";
 echo "Using format: $imgtype";
 echo " ";
 case $imgtype in
+  AOSP_VNDR) "$bin/$arch/mkbootimg" --vendor_ramdisk "$ramdisk" "${dtb[@]}" --vendor_cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --tags_offset $tagsoff --dtb_offset $dtboff --os_version "$osver" --os_patch_level "$oslvl" --header_version $hdrver --vendor_boot $outname;;
   AOSP) "$bin/$arch/mkbootimg" --kernel "$kernel" --ramdisk "$ramdisk" "${second[@]}" "${dtb[@]}" "${recoverydtbo[@]}" --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --dtb_offset "$dtboff" --os_version "$osver" --os_patch_level "$oslvl" --header_version "$hdrver" $hashtype "${dt[@]}" -o $outname;;
   AOSP-PXA) "$bin/$arch/pxa-mkbootimg" --kernel "$kernel" --ramdisk "$ramdisk" "${second[@]}" --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff --second_offset "$secondoff" --tags_offset "$tagsoff" --unknown $unknown "${dt[@]}" -o $outname;;
   ELF) "$bin/$arch/elftool" pack -o $outname header="$header" "$kernel" "$ramdisk",ramdisk "${rpm[@]}" "${cmd[@]}" >/dev/null;;
@@ -281,7 +301,7 @@ case $imgtype in
   OSIP)
     mkdir split_img/.temp 2>/dev/null;
     for i in bootstub cmdline.txt hdr kernel parameter sig; do
-      cp -f split_img/*-$(basename $i .txt | sed -e 's/hdr/header/' -e 's/kernel/zImage/') split_img/.temp/$i 2>/dev/null;
+      cp -f split_img/*-*$(basename $i .txt | sed -e 's/hdr/header/') split_img/.temp/$i 2>/dev/null;
     done;
     cp -f "$ramdisk" split_img/.temp/ramdisk.cpio.gz;
     "$bin/$arch/mboot" -d split_img/.temp -f $outname;
@@ -314,7 +334,7 @@ if [ -f split_img/*-sigtype ]; then
   echo "Signing new image...";
   echo " ";
   echo "Using signature: $sigtype $avbtype$avbtxt$blobtype";
-  test ! "$avbkey" && avbkey="$bin/avb/verity";
+  [ ! "$avbkey" ] && avbkey="$bin/avb/verity";
   echo " ";
   case $sigtype in
     AVBv1) java -jar "$bin/boot_signer.jar" /$avbtype unsigned-new.img "$avbkey.pk8" "$avbkey.x509."* image-new.img 2>/dev/null;;

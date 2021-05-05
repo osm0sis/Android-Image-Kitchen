@@ -59,7 +59,7 @@ libiconv.2, libintl.8, liblzma.5, liblzo2.2, libmagic.1 (macOS):
 https://www.macports.org/
 
 gzip, bzip2, lzop, xz;
-awk, basename, bash, cpio, cut, dd, dirname, env, file, find, grep, hexdump, printf, rev, sed, stat, sudo, tail, truncate, wc (Linux):
+awk, basename, bash, cpio, cut, dd, dirname, env, file, find, grep, hexdump, java, printf, rev, sed, stat, sudo, tail, truncate, wc (Linux):
 (required system packages/commands)
 
 androidbootimg.magic:

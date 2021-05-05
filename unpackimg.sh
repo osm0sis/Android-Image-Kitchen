@@ -45,7 +45,7 @@ case $plat in
   ;;
   linux)
     cpio=cpio;
-    test "$(cpio --version | head -n1 | rev | cut -d\  -f1 | rev)" == "2.13" && cpiowarning=1;
+    [ "$(cpio --version | head -n1 | rev | cut -d\  -f1 | rev)" = "2.13" ] && cpiowarning=1;
     statarg="-c %U";
   ;;
 esac;
@@ -56,7 +56,8 @@ fi;
 chmod -R 755 "$bin" "$aik"/*.sh;
 chmod 644 "$bin/magic" "$bin/androidbootimg.magic" "$bin/boot_signer.jar" "$bin/avb/"* "$bin/chromeos/"*;
 
-test -f "$cur/$1" && img="$cur/$1" || img="$1";
+img="$1";
+[ -f "$cur/$1" ] && img="$cur/$1";
 if [ ! "$img" ]; then
   while IFS= read -r line; do
     case $line in
@@ -132,7 +133,7 @@ fi;
 
 imgtest="$(file -m "$bin/androidbootimg.magic" "$img" 2>/dev/null | cut -d: -f2-)";
 if [ "$(echo $imgtest | awk '{ print $2 }' | cut -d, -f1)" = "bootimg" ]; then
-  test "$(echo $imgtest | awk '{ print $3 }')" = "PXA" && typesuffix=-PXA;
+  [ "$(echo $imgtest | awk '{ print $3 }')" = "PXA" ] && typesuffix=-PXA;
   echo "$(echo $imgtest | awk '{ print $1 }')$typesuffix" > "$file-imgtype";
   imgtype=$(cat "$file-imgtype");
 else
@@ -216,7 +217,10 @@ fi;
 
 echo 'Splitting image to "split_img/"...';
 case $imgtype in
-  AOSP) "$bin/$arch/unpackbootimg" -i "$img";;
+  AOSP_VNDR) vendor=vendor_;;
+esac;
+case $imgtype in
+  AOSP|AOSP_VNDR) "$bin/$arch/unpackbootimg" -i "$img";;
   AOSP-PXA) "$bin/$arch/pxa-unpackbootimg" -i "$img";;
   ELF)
     mkdir elftool_out;
@@ -225,12 +229,12 @@ case $imgtype in
     rm -rf elftool_out;
     "$bin/$arch/unpackelf" -i "$img";
   ;;
-  KRNL) dd bs=4096 skip=8 iflag=skip_bytes conv=notrunc if="$img" of="$file-ramdisk.cpio.gz" 2>&1 | tail -n+3 | cut -d" " -f1-2;;
+  KRNL) dd bs=4096 skip=8 iflag=skip_bytes conv=notrunc if="$img" of="$file-ramdisk" 2>&1 | tail -n+3 | cut -d" " -f1-2;;
   OSIP)
     "$bin/$arch/mboot" -u -f "$img";
-    test ! $? -eq "0" && error=1;
+    [ ! $? -eq "0" ] && error=1;
     for i in bootstub cmdline.txt hdr kernel parameter ramdisk.cpio.gz sig; do
-      mv -f $i "$file-$(basename $i .txt | sed -e 's/hdr/header/' -e 's/kernel/zImage/')" 2>/dev/null || true;
+      mv -f $i "$file-$(basename $i .txt | sed -e 's/hdr/header/' -e 's/ramdisk.cpio.gz/ramdisk/')" 2>/dev/null || true;
     done;
   ;;
   U-Boot)
@@ -244,12 +248,12 @@ case $imgtype in
     grep "Address:" "$file-header" | cut -c15- > "$file-addr";
     grep "Point:" "$file-header" | cut -c15- > "$file-ep";
     rm -f "$file-header";
-    "$bin/$arch/dumpimage" -p 0 -o "$file-zImage" "$img";
-    test ! $? -eq "0" && error=1;
+    "$bin/$arch/dumpimage" -p 0 -o "$file-kernel" "$img";
+    [ ! $? -eq "0" ] && error=1;
     case $(cat "$file-type") in
-      Multi) "$bin/$arch/dumpimage" -p 1 -o "$file-ramdisk.cpio.gz" "$img";;
-      RAMDisk) mv -f "$file-zImage" "$file-ramdisk.cpio.gz";;
-      *) touch "$file-ramdisk.cpio.gz";;
+      Multi) "$bin/$arch/dumpimage" -p 1 -o "$file-ramdisk" "$img";;
+      RAMDisk) mv -f "$file-kernel" "$file-ramdisk";;
+      *) touch "$file-ramdisk";;
     esac;
   ;;
 esac;
@@ -260,24 +264,24 @@ if [ ! $? -eq "0" -o "$error" ]; then
   exit 1;
 fi;
 
-if [ "$(file -m "$bin/androidbootimg.magic" *-zImage 2>/dev/null | cut -d: -f2 | awk '{ print $1 }')" = "MTK" ]; then
+if [ -f *-kernel ] && [ "$(file -m "$bin/androidbootimg.magic" *-kernel 2>/dev/null | cut -d: -f2 | awk '{ print $1 }')" = "MTK" ]; then
   mtk=1;
   echo " ";
-  echo "MTK header found in zImage, removing...";
-  dd bs=512 skip=1 conv=notrunc if="$file-zImage" of=tempzimg 2>/dev/null;
-  mv -f tempzimg "$file-zImage";
+  echo "MTK header found in kernel, removing...";
+  dd bs=512 skip=1 conv=notrunc if="$file-kernel" of=tempkern 2>/dev/null;
+  mv -f tempkern "$file-kernel";
 fi;
-mtktest="$(file -m "$bin/androidbootimg.magic" *-ramdisk*.gz 2>/dev/null | cut -d: -f2-)";
+mtktest="$(file -m "$bin/androidbootimg.magic" *-*ramdisk 2>/dev/null | cut -d: -f2-)";
 mtktype=$(echo $mtktest | awk '{ print $3 }');
 if [ "$(echo $mtktest | awk '{ print $1 }')" = "MTK" ]; then
   if [ ! "$mtk" ]; then
     echo " ";
-    echo "Warning: No MTK header found in zImage!";
+    echo "Warning: No MTK header found in kernel!";
     mtk=1;
   fi;
   echo "MTK header found in \"$mtktype\" type ramdisk, removing...";
-  dd bs=512 skip=1 conv=notrunc if="$(ls *-ramdisk*.gz)" of=temprd 2>/dev/null;
-  mv -f temprd "$(ls *-ramdisk*.gz)";
+  dd bs=512 skip=1 conv=notrunc if="$(ls *-*ramdisk)" of=temprd 2>/dev/null;
+  mv -f temprd "$(ls *-*ramdisk)";
 else
   if [ "$mtk" ]; then
     if [ ! "$mtktype" ]; then
@@ -286,7 +290,7 @@ else
     fi;
   fi;
 fi;
-test "$mtk" && echo $mtktype > "$file-mtktype";
+[ "$mtk" ] && echo $mtktype > "$file-mtktype";
 
 if [ -f *-dt ]; then
   dttest="$(file -m "$bin/androidbootimg.magic" *-dt 2>/dev/null | cut -d: -f2 | awk '{ print $1 }')";
@@ -295,17 +299,17 @@ if [ -f *-dt ]; then
     case $dttest in
       QCDT|ELF) ;;
       *) echo " ";
-         echo "Non-QC DTB found, packing zImage and appending...";
-         gzip --no-name -9 "$file-zImage";
-         mv -f "$file-zImage.gz" "$file-zImage";
-         cat "$file-dt" >> "$file-zImage";
+         echo "Non-QC DTB found, packing kernel and appending...";
+         gzip --no-name -9 "$file-kernel";
+         mv -f "$file-kernel.gz" "$file-kernel";
+         cat "$file-dt" >> "$file-kernel";
          rm -f "$file-dt"*;;
     esac;
   fi;
 fi;
 
-file -m "$bin/magic" *-ramdisk*.gz 2>/dev/null | cut -d: -f2 | awk '{ print $1 }' > "$file-ramdiskcomp";
-ramdiskcomp=`cat *-ramdiskcomp`;
+file -m "$bin/magic" *-*ramdisk 2>/dev/null | cut -d: -f2 | awk '{ print $1 }' > "$file-${vendor}ramdiskcomp";
+ramdiskcomp=`cat *-*ramdiskcomp`;
 unpackcmd="$ramdiskcomp -dc";
 compext=$ramdiskcomp;
 case $ramdiskcomp in
@@ -323,7 +327,7 @@ esac;
 if [ "$compext" ]; then
   compext=.$compext;
 fi;
-mv -f "$(ls *-ramdisk*.gz)" "$file-ramdisk.cpio$compext" 2>/dev/null;
+mv -f "$(ls *-*ramdisk)" "$file-${vendor}ramdisk.cpio$compext" 2>/dev/null;
 cd ..;
 if [ "$ramdiskcomp" = "data" ]; then
   echo "Unrecognized format.";
@@ -349,9 +353,9 @@ else
   fi;
   $sudo chown 0:0 ramdisk 2>/dev/null;
   cd ramdisk;
-  $unpackcmd "../split_img/$file-ramdisk.cpio$compext" | $sudo $cpio -i -d --no-absolute-filenames;
+  $unpackcmd "../split_img/$file-${vendor}ramdisk.cpio$compext" | $sudo $cpio -i -d --no-absolute-filenames;
   if [ ! $? -eq "0" ]; then
-    test "$nosudo" && echo "Unpacking failed, try without --nosudo.";
+    [ "$nosudo" ] && echo "Unpacking failed, try without --nosudo.";
     cd ..;
     abort;
     exit 1;
